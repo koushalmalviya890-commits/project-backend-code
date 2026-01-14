@@ -1,0 +1,23 @@
+image: alpine:latest
+
+variables:
+  REPO_NAME: $(basename "$CI_PROJECT_PATH")
+  TARGET_BRANCH: $CI_COMMIT_REF_NAME
+  GITLAB_REPO_URL: "https://$CI_DEPLOY_USER:$CI_DEPLOY_PASSWORD@$CI_SERVER_HOST/$CI_PROJECT_PATH.git"
+  ENVIRON: "devapps"
+
+pages:
+  stage: deploy
+  before_script:
+    - 'command -v ssh-agent >/dev/null || ( apk add --update openssh )' 
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY_HOSTINGER" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $IPADDRESS_HOSTINGER >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - if [[ "$CI_COMMIT_REF_NAME" == "main" ]]; then export ENVIRON="devapps"; fi
+  script:
+    - ssh $SSH_USER@$IPADDRESS_HOSTINGER "cd /tmp/ && rm -rf $REPO_NAME/ && sudo git clone -b $TARGET_BRANCH $GITLAB_REPO_URL && sudo cp -r -f /tmp/$REPO_NAME/* /$ENVIRON/$REPO_NAME/ && cd /$ENVIRON/$REPO_NAME/ && sudo docker-compose down && sudo docker-compose up -d --build --force-recreate && rm -r /tmp/$REPO_NAME  && sudo docker system prune -a -f  && exit"
+  only:
+    - branches
