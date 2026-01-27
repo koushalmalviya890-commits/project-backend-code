@@ -15,6 +15,11 @@ const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
+
+//Shivam added
+const sectorRoutes = require("./src/routes/SectorRoutes");
+const bookingRoutes = require("./src/routes/BookingRoutes");
+
 const CronJobService = require('./services/cronJobService');
 
 
@@ -104,6 +109,8 @@ app.get("/", (req, res) => res.send("API is running 🚀"));
 // app.use("/api/users", tes);
 app.use("/api", eventDetailRoutes);
 app.use("/api/facility-bookings", facilityBookingRoutes);
+app.use("/api/sectors", sectorRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 // ---------------------------
 // Error handling

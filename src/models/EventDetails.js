@@ -12,29 +12,29 @@ const chiefGuestSchema = new mongoose.Schema({
 });
 
 const collectPersonalInfoSchema = new mongoose.Schema({
-  fullName: { type: String,required:true },
-  email: { type: String,enum:['required' , 'optional'] },
-  phoneNumber: { type: String,enum:['required' , 'optional'] },
+  fullName: { type: String, required: true },
+  email: { type: String, enum: ['required', 'optional'] },
+  phoneNumber: { type: String, enum: ['required', 'optional'] },
 });
 
 const collectIdentityProofSchema = new mongoose.Schema({
-  idProof: { type: String, enum: ['required', 'optional' , 'off'] },
+  idProof: { type: String, enum: ['required', 'optional', 'off'] },
   idProofType: { type: String, enum: ['Aadhar Card', 'PAN Card', 'Driving License', 'Passport'] },
-  idNumber:{type:String , enum:['required' , 'optional' , 'off']},
-  websiteLink:{type:String , enum:['required' , 'optional' , 'off']},
+  idNumber: { type: String, enum: ['required', 'optional', 'off'] },
+  websiteLink: { type: String, enum: ['required', 'optional', 'off'] },
 });
 
 const customQuestionsSchema = new mongoose.Schema({
-  questionType: { type: String, enum: ['text', 'radio' , 'checkbox' ,'options' , 'website'] },
+  questionType: { type: String, enum: ['text', 'radio', 'checkbox', 'options', 'website'] },
   question: { type: String },
   options: [{ type: String }], // For 'radio', 'checkbox', 'options' types
-  isRequired: { type: String,enum:['required' , 'optional'] , default: 'optional'},
+  isRequired: { type: String, enum: ['required', 'optional'], default: 'optional' },
 });
 
 const couponThingsSchema = new mongoose.Schema({
   couponCode: { type: String },
-  minimumValue:{type: Number }, // minimum ticket price to apply coupon
-  discount:{ type: Number }, // percentage discount
+  minimumValue: { type: Number }, // minimum ticket price to apply coupon
+  discount: { type: Number }, // percentage discount
   validFrom: { type: Date },
   validTo: { type: Date },
 
@@ -43,7 +43,7 @@ const couponThingsSchema = new mongoose.Schema({
 const postEventFeedbackSchema = new mongoose.Schema({
   scheduledDateTime: { type: Date },
   bodyContent: { type: String },
-    sent: { type: Boolean, default: false }, // Track if feedback was sent
+  sent: { type: Boolean, default: false }, // Track if feedback was sent
   sentAt: { type: Date }, // When it was sent
   recipientCount: { type: Number, default: 0 } // How many emails were sent
 });
@@ -53,12 +53,12 @@ const socialMediaLinksSchema = new mongoose.Schema({
 });
 
 const eventDetailSchema = new mongoose.Schema({
- 
-//Event details Tab
-// Service Provider Link
+
+  //Event details Tab
+  // Service Provider Link
   serviceProviderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Service Provider', required: true },
   serviceProviderName: { type: String },
-  
+
   bookedTicketsCount: { type: Number, default: 0 }, // To track number of booked tickets
 
   // Event Details
@@ -77,28 +77,28 @@ const eventDetailSchema = new mongoose.Schema({
   chiefGuests: [chiefGuestSchema],
   hasChiefGuest: { type: Boolean, default: false },
   hasFeatures: { type: Boolean, default: false },
-  approvalStatus: {type:String , enum: ['pending', 'approved' , 'rejected'  ], default: 'pending'},
-  activeStatus: { type: String, enum: ['upcoming', 'ongoing', 'completed' , 'cancelled'], default: 'upcoming' },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  activeStatus: { type: String, enum: ['upcoming', 'ongoing', 'completed', 'cancelled'], default: 'upcoming' },
   // Timestamps
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   isFeatured: { type: Boolean, default: false },
 
-// Ticket registration details Tab
+  // Ticket registration details Tab
   ticketType: { type: String, enum: ['free', 'paid'], default: 'free', trim: true },
-  applyGst: { type: String, enum:['yes' , 'no'] ,default: "no" , trim: true },
-  applyPlatformFee: { type: String, enum:['yes' , 'no'] ,default: "no" , trim: true },
-  tickets:{type:String , enum: ['limited', 'unlimited'], default: 'unlimited' },
+  applyGst: { type: String, enum: ['yes', 'no'], default: "no", trim: true },
+  applyPlatformFee: { type: String, enum: ['yes', 'no'], default: "no", trim: true },
+  tickets: { type: String, enum: ['limited', 'unlimited'], default: 'unlimited' },
   ticketCapacity: { type: Number },
   ticketPrice: { type: Number },
   bulkRegistration: { type: Boolean, default: false },
   bulkTickets: { type: Number },
-  registrationStartDateTime: { type: Date , required:true },
-  registrationEndDateTime: { type: Date  , required:true },
-  customizeTicketEmail:{type:Boolean, default:false},
+  registrationStartDateTime: { type: Date, required: true },
+  registrationEndDateTime: { type: Date, required: true },
+  customizeTicketEmail: { type: Boolean, default: false },
   ticketEmailContent: { type: String },
-  bulkEmailFile:{ type: String }, 
-  limitedEventAccess: {type:Boolean, default:false},
+  bulkEmailFile: { type: String },
+  limitedEventAccess: { type: Boolean, default: false },
   // Array of email addresses
   // limited
 
@@ -107,7 +107,7 @@ const eventDetailSchema = new mongoose.Schema({
   collectPersonalInfo: [collectPersonalInfoSchema],
   collectIdentityProof: [collectIdentityProofSchema],
   customQuestions: [customQuestionsSchema],
-  customizeRegistrationEmail:{type:Boolean, default:false},
+  customizeRegistrationEmail: { type: Boolean, default: false },
   registrationEmailBodyContent: { type: String },
 
   //Terms and Conditions Tab
