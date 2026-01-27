@@ -12,6 +12,11 @@ const corsOptions = require("./src/config/corsOption");
 // const userRoutes = require("./src/routes/userRoutes");
 const eventDetailRoutes = require("./src/routes/eventDetailRoutes");
 const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
+const authRoutes = require("./src/routes/authRoutes");
+const affiliateRoutes = require("./src/routes/affiliateRoutes");
+const startupRoutes = require("./src/routes/startupRoutes");
+const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
+const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
@@ -32,7 +37,7 @@ const app = express();
 // ---------------------------
 app.use(cors(corsOptions));
 app.use(helmet());
-
+app.use(cookieParser());
 
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(bodyParser.json());
@@ -109,9 +114,16 @@ app.get("/", (req, res) => res.send("API is running 🚀"));
 // app.use("/api/users", tes);
 app.use("/api", eventDetailRoutes);
 app.use("/api/facility-bookings", facilityBookingRoutes);
+<<<<<<< HEAD
 app.use("/api/sectors", sectorRoutes);
 app.use("/api/bookings", bookingRoutes);
 
+=======
+app.use('/api/auth', authRoutes);
+app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
+app.use('/api/startup', startupRoutes); // Startup routes
+app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
+>>>>>>> dev
 // ---------------------------
 // Error handling
 // ---------------------------
