@@ -18,6 +18,11 @@ const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
 const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
+const authRoutes = require("./src/routes/authRoutes");
+const affiliateRoutes = require("./src/routes/affiliateRoutes");
+// const startupRoutes = require("./src/routes/startupRoutes");
+const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
+const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
@@ -32,6 +37,7 @@ const app = express();
 // ---------------------------
 app.use(cors(corsOptions));
 app.use(helmet());
+app.use(cookieParser());
 
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(bodyParser.json());
@@ -112,11 +118,15 @@ app.use("/api", eventDetailRoutes);
 app.use("/api/facility-bookings", facilityBookingRoutes);
 app.use("/api/maps", mapRoutes);
 app.use("/api/uploads", uploadRoutes);
-app.use("/api/startup", startupRoutes);
+// app.use("/api/startup", startupRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app
+app.use('/api/auth', authRoutes);
+app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
+app.use('/api/startup', startupRoutes); // Startup routes
+app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
 // ---------------------------
 // Error handling
 // ---------------------------
