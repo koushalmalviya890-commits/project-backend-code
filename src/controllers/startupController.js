@@ -1,3 +1,4 @@
+
 // import Startup from '../models/Startup.js';
 // import mongoose from 'mongoose';
 const mongoose = require('mongoose');
@@ -46,3 +47,16 @@ exports.updateStartupProfile = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 };
+
+exports.getStartupBookings = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const bookings = await startupService.getStartupBookings(userId);
+    res.json(bookings);
+  } catch (error) {
+    console.error("Error fetching startup bookings:", error);
+    res.status(500).json({ error: "Failed to fetch bookings" });
+  }
+}
+

@@ -1,7 +1,6 @@
 require("module-alias/register");
 require("dotenv").config();
-require('./src/models/ServiceProvider'); // Load ServiceProvider first
-
+require("./src/models/ServiceProvider"); // Load ServiceProvider first
 
 const express = require("express");
 const cors = require("cors");
@@ -14,14 +13,20 @@ const eventDetailRoutes = require("./src/routes/eventDetailRoutes");
 const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const affiliateRoutes = require("./src/routes/affiliateRoutes");
-const startupRoutes = require("./src/routes/startupRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const cookieParser = require("cookie-parser");
+const mapRoutes = require("./src/routes/mapRoutes");
+const uploadRoutes = require("./src/routes/uploadRoutes");
+const startupRoutes = require("./src/routes/startupRoutes");
+const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
+const chatRoutes = require("./src/routes/chatRoutes");
+const checkUserRoutes = require("./src/routes/checkUserRoutes");
+const customersRoutes = require("./src/routes/customersRoutes");
+
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
-const CronJobService = require('./services/cronJobService');
-
+const CronJobService = require("./src/services/cronJobService");
 
 // Initialize cron jobs
 const cronService = new CronJobService();
@@ -33,6 +38,7 @@ const app = express();
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(cookieParser());
+
 
 // Middleware for parsing JSON and URL-encoded bodies
 app.use(bodyParser.json());
@@ -50,11 +56,12 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-
 // / Optional: Add endpoint to manually trigger feedback (for testing)
-app.post('/api/trigger-feedback/:eventId', async (req, res) => {
+app.post("/api/trigger-feedback/:eventId", async (req, res) => {
   try {
-    const result = await cronService.triggerPostEventFeedback(req.params.eventId);
+    const result = await cronService.triggerPostEventFeedback(
+      req.params.eventId,
+    );
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -62,10 +69,13 @@ app.post('/api/trigger-feedback/:eventId', async (req, res) => {
 });
 
 // NEW: Endpoint to manually trigger event reminders
-app.post('/api/trigger-reminders/:eventId', async (req, res) => {
+app.post("/api/trigger-reminders/:eventId", async (req, res) => {
   try {
     const { reminderType } = req.query; // ?reminderType=1hour or 1day or both
-    const result = await cronService.triggerEventReminders(req.params.eventId, reminderType || 'both');
+    const result = await cronService.triggerEventReminders(
+      req.params.eventId,
+      reminderType || "both",
+    );
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -73,19 +83,17 @@ app.post('/api/trigger-reminders/:eventId', async (req, res) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('📴 Shutting down cron jobs...');
+process.on("SIGTERM", () => {
+  console.log("📴 Shutting down cron jobs...");
   cronService.stopAllJobs();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
-  console.log('📴 Shutting down cron jobs...');
+process.on("SIGINT", () => {
+  console.log("📴 Shutting down cron jobs...");
   cronService.stopAllJobs();
   process.exit(0);
 });
-
-
 
 // // OR use conditional middleware:
 // app.use((req, res, next) => {
@@ -113,6 +121,11 @@ app.use('/api/auth', authRoutes);
 app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
 app.use('/api/startup', startupRoutes); // Startup routes
 app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
+app.use("/api/maps", mapRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/extent-bookings", extentBookingRoutes);
+app.use("/api", chatRoutes);
+app.use("/api", checkUserRoutes);
 // ---------------------------
 // Error handling
 // ---------------------------
