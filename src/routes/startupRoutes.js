@@ -1,5 +1,5 @@
 const express = require('express');
-const { getStartupProfile, updateStartupProfile } = require('../controllers/startupController');
+const { getStartupProfile, updateStartupProfile, getStartupBookings } = require('../controllers/startupController');
 const { protect } = require('../middleware/authMiddleware.js'); // The middleware we wrote earlier
 
 const router = express.Router();
@@ -7,5 +7,6 @@ const router = express.Router();
 // Routes are now protected by our JWT cookie verification
 router.get('/profile', protect, getStartupProfile);
 router.patch('/profile', protect, updateStartupProfile);
+router.get("/bookings/:userId", getStartupBookings);
 
 module.exports = router;
