@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
+const {protect} = require("../middleware/authMiddleware");
+
 const {
   updateBookingStatusController,
 } = require("../controllers/BookingController");
@@ -21,15 +23,28 @@ const {
   getFailedBookingController,
 } = require("../controllers/BookingFailedController");
 
+// ---------------- ROUTES ----------------
 
-router.post("/update-status", updateBookingStatusController);
+console.log("authMiddleware:", protect);
+console.log("updateBookingStatusController:", updateBookingStatusController);
+console.log("createBookingController:", createBookingController);
+console.log("getBookingsController:", getBookingsController);
+console.log("getBookingByIdController:", getBookingByIdController);
+console.log("getFailedBookingController:", getFailedBookingController);
 
-router.post("/", createBookingController);
+// Status update
+router.post("/update-status", protect, updateBookingStatusController);
 
-router.get("/" , getBookingsController);
+// Create booking
+router.post("/", protect, createBookingController);
 
-router.get("/:id", authMiddleware, getBookingByIdController);
+// List bookings
+router.get("/", protect, getBookingsController);
 
-router.get("/failed", authMiddleware, getFailedBookingController);
+// Failed payments (MUST COME BEFORE :id)
+router.get("/failed", protect, getFailedBookingController);
+
+// Booking detail (LAST)
+router.get("/:id", protect, getBookingByIdController);
 
 module.exports = router;
