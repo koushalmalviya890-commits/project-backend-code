@@ -25,6 +25,8 @@ const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
 const chatRoutes = require("./src/routes/chatRoutes");
 const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
+const notificationRoutes = require("./src/routes/notificationRoutes");
+
 const bodyParser = require("body-parser");
 const CronJobService = require("./src/services/cronJobService");
 
@@ -128,7 +130,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
-
+app.use("/api/notifications", notificationRoutes);
 // ---------------------------
 // Error handling
 // ---------------------------
