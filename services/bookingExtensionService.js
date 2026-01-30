@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const BookingExtension = require("../models/BookingExtension");
-const Startup = require("../models/Startup");
+const BookingExtension = require("../src/models/BookingExtension");
+const Startup = require("../src/models/Startup");
 
 async function createExtension(userId, payload) {
   const objectId = mongoose.Types.ObjectId.isValid(userId)

@@ -20,13 +20,15 @@ const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const affiliateRoutes = require("./src/routes/affiliateRoutes");
+const reviewsRoutes = require("./src/routes/reviewsRoutes");
+const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 // const startupRoutes = require("./src/routes/startupRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
-const CronJobService = require("./src/services/cronJobService");
+const CronJobService = require("./services/cronJobService");
 
 // Initialize cron jobs
 const cronService = new CronJobService();
@@ -122,11 +124,14 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
-app
-app.use('/api/auth', authRoutes);
-app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
-app.use('/api/startup', startupRoutes); // Startup routes
-app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
+app.use("/api/customers", customersRoutes);
+app.use("/api/reviews", reviewsRoutes); // Reviews routes
+app.use("/api/fetch-startups", fetchStartupsRoutes); // Fetch Startups routes
+app;
+app.use("/api/auth", authRoutes);
+app.use("/api/affiliate", affiliateRoutes); // Affiliate routes
+app.use("/api/startup", startupRoutes); // Startup routes
+app.use("/api/service-provider", serviceProviderRoutes); // Service Provider routes
 // ---------------------------
 // Error handling
 // ---------------------------
