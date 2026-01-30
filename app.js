@@ -27,9 +27,11 @@ const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const facilityRoutes = require("./src/routes/facilityRoutes");
-
+const reviewsRoutes = require("./src/routes/reviewsRoutes");
+const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const bodyParser = require("body-parser");
-const CronJobService = require("./src/services/cronJobService");
+const CronJobService = require("./services/cronJobService");
+
 
 
 // Initialize cron jobs
@@ -127,12 +129,19 @@ app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
 app.use('/api/startup', startupRoutes); // Startup routes
 app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
 app.use("/api/maps", mapRoutes);
-app.use("/api/uploads", uploadRoutes);
-app.use("/api/extent-bookings", extentBookingRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use('/api/facilities', facilityRoutes)
+app.use("/api/uploads", uploadRoutes);
+// app.use("/api/startup", startupRoutes);
+app.use("/api/extent-bookings", extentBookingRoutes);
+app.use("/api", chatRoutes);
+app.use("/api", checkUserRoutes);
+app.use("/api/customers", customersRoutes);
+app.use("/api/reviews", reviewsRoutes); // Reviews routes
+app.use("/api/fetch-startups", fetchStartupsRoutes); // Fetch Startups routes
+
 // ---------------------------
 // Error handling
 // ---------------------------
