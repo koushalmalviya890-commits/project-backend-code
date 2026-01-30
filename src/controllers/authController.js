@@ -14,6 +14,12 @@ const Startup = require("../models/Startup");
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
+    // In authController.js, add validation at the top of login function
+if (!process.env.JWT_SECRET) {
+  return res.status(500).json({ 
+    message: 'Server configuration error: JWT_SECRET not configured' 
+  });
+}
     const user = await User.findOne({ email });
     if (!user) return res.status(401).json({ message: 'User not found' });
 

@@ -26,6 +26,8 @@ const {
 // ---------------- ROUTES ----------------
 
 
+
+
 // Status update
 router.post("/update-status", protect, updateBookingStatusController);
 

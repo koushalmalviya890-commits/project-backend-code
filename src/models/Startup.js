@@ -1,6 +1,7 @@
+
 const mongoose = require('mongoose')
 // const { ENTITY_TYPES, LOOKING_FOR } = require('@/lib/constants') // Uncomment if used
-
+const { ENTITY_TYPES, LOOKING_FOR } = require("../constants");
 const startupSchema = new mongoose.Schema(
   {
     userId: {
