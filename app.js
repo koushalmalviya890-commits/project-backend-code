@@ -8,7 +8,7 @@ const path = require("path");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const corsOptions = require("./src/config/corsOption");
-// const userRoutes = require("./src/routes/userRoutes");
+const userRoutes = require("./src/routes/userRoutes");
 const eventDetailRoutes = require("./src/routes/eventDetailRoutes");
 const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const authRoutes = require("./src/routes/authRoutes");
@@ -26,6 +26,7 @@ const chatRoutes = require("./src/routes/chatRoutes");
 const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
+const facilityRoutes = require("./src/routes/facilityRoutes");
 
 const bodyParser = require("body-parser");
 const CronJobService = require("./src/services/cronJobService");
@@ -47,7 +48,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // JSON + URL-encoded parsers
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Multer for handling ALL FormData requests (files + fields)
@@ -131,6 +132,7 @@ app.use("/api/extent-bookings", extentBookingRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use('/api/facilities', facilityRoutes)
 // ---------------------------
 // Error handling
 // ---------------------------
