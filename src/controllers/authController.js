@@ -88,7 +88,15 @@ exports.getMe = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(401).json({ message: "User not found" });
-    res.json({ user });
+   res.json({
+     user: {
+       id: user._id, // <--- This matches what your frontend expects
+       email: user.email,
+       name: user.name,
+       userType: user.userType,
+       // Add any other fields you need here
+     },
+   });
   } catch (err) {
     res.status(401).json({ message: "Invalid token" });
   }

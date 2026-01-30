@@ -1,4 +1,4 @@
-const { checkUser } = require("../services/checkUserService");
+const { checkUser } = require("../../services/checkUserService");
 
 async function checkUserController(req, res) {
   try {
