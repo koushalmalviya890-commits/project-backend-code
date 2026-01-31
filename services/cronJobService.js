@@ -1,13 +1,13 @@
 // services/cronJobService.js
 const cron = require("node-cron");
 const moment = require("moment-timezone");
-const EventDetail = require("../models/EventDetails");
-const EventBookingDetail = require("../models/EventBookingDetails");
-const { sendPostEventFeedbackEmail } = require("../../lib/emailService");
+const EventDetail = require("../src/models/EventDetails");
+const EventBookingDetail = require("../src/models/EventBookingDetails");
+const { sendPostEventFeedbackEmail } = require("../lib/emailService");
 const {
   sendOneHourReminderEmail,
   sendOneDayReminderEmail,
-} = require("../../lib/emailService");
+} = require("../lib/emailService");
 
 class CronJobService {
   constructor() {

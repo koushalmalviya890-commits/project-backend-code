@@ -8,13 +8,11 @@ const path = require("path");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const corsOptions = require("./src/config/corsOption");
-const userRoutes = require("./src/routes/userRoutes");
+// const userRoutes = require("./src/routes/userRoutes");
 const eventDetailRoutes = require("./src/routes/eventDetailRoutes");
 const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const authRoutes = require("./src/routes/authRoutes");
 const affiliateRoutes = require("./src/routes/affiliateRoutes");
-const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
-const cookieParser = require("cookie-parser");
 const mapRoutes = require("./src/routes/mapRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const startupRoutes = require("./src/routes/startupRoutes");
@@ -24,11 +22,14 @@ const checkUserRoutes = require("./src/routes/checkUserRoutes");
 const customersRoutes = require("./src/routes/customersRoutes");
 const notificationRoutes = require("./src/routes/notificationRoutes");
 const facilityRoutes = require("./src/routes/facilityRoutes");
-
+const reviewsRoutes = require("./src/routes/reviewsRoutes");
+const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
+const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
+const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
-const CronJobService = require("./src/services/cronJobService");
+const CronJobService = require("./services/cronJobService");
 
 // Initialize cron jobs
 const cronService = new CronJobService();
@@ -119,9 +120,7 @@ app.get("/", (req, res) => res.send("API is running 🚀"));
 // app.use("/api/users", tes);
 app.use("/api", eventDetailRoutes);
 app.use("/api/facility-bookings", facilityBookingRoutes);
-app.use('/api/auth', authRoutes);
 app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
-app.use('/api/startup', startupRoutes); // Startup routes
 app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
 app.use("/api/maps", mapRoutes);
 app.use("/api/uploads", uploadRoutes);
@@ -130,6 +129,11 @@ app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use('/api/facilities', facilityRoutes)
+app.use("/api/customers", customersRoutes);
+app.use("/api/reviews", reviewsRoutes); // Reviews routes
+app.use("/api/fetch-startups", fetchStartupsRoutes); // Fetch Startups routes
+app.use("/api/auth", authRoutes);
+app.use("/api/startup", startupRoutes); // Startup routes
 // ---------------------------
 // Error handling
 // ---------------------------
