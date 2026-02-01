@@ -1,6 +1,6 @@
-const Notification = require('../src/models/Notification');
+const Notification = require('../models/Notification');
 
-
+// Usage: await notificationService.createBookingApprovedNotification(...)
 exports.createBookingApprovedNotification = async (
   serviceProviderId,
   bookingId,

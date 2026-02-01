@@ -1,9 +1,8 @@
 // import Startup from '../models/Startup.js';
 // import mongoose from 'mongoose';
 const mongoose = require('mongoose');
-const Startup = require('../models/Startup');
-const startupService = require("../services/startupService");
-// GET PROFILE
+const startupService = require("../../services/startupService");
+const Startup = require("../models/Startup");
 exports.getStartupProfile = async (req, res) => {
   try {
     // req.user is populated by our 'protect' middleware
@@ -61,6 +60,7 @@ exports.getStartupBookings = async (req, res) => {
     console.error("Error fetching startup bookings:", error);
     res.status(500).json({ error: "Failed to fetch bookings" });
   }
+
 }
 
 
