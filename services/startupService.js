@@ -48,7 +48,7 @@ async function getStartupBookings(userId) {
   const db = mongoose.connection.db;
 
   const bookings = await db
-    .collection("Bookings") 
+    .collection("Bookings")
     .find({ startupId: startup._id }) // IMPORTANT
     .sort({ createdAt: -1 })
     .toArray();

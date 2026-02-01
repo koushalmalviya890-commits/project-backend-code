@@ -1,9 +1,10 @@
 // src/models/Sectors.ts
-//import mongoose from "mongoose";
-
 const mongoose = require("mongoose");
 
-const sectorSchema = new mongoose.Schema({
+
+const { Schema } = mongoose
+
+const sectorSchema = new Schema({
   name: {
     type: String,
     required: true,
@@ -20,10 +21,7 @@ const sectorSchema = new mongoose.Schema({
   },
 });
 
-module.exports =
+const Sector =
   mongoose.models.Sector || mongoose.model("Sector", sectorSchema);
 
-
-
-
-  //module.exports = mongoose.models.ServiceProvider || mongoose.model('Service Provider', serviceProviderSchema, 'Service Provider');
+module.exports = Sector;

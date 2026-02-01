@@ -1,13 +1,14 @@
-
 const mongoose = require('mongoose')
 // const { ENTITY_TYPES, LOOKING_FOR } = require('@/lib/constants') // Uncomment if used
 const { ENTITY_TYPES, LOOKING_FOR } = require("../constants");
+
 const startupSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Users',
       required: true,
+      index: true
     },
     startupName: {
       type: String,
@@ -216,7 +217,10 @@ const startupSchema = new mongoose.Schema(
     },
   },
   {
-    collection: 'Startups',
+   timestamps: true, // Auto-manages createdAt and updatedAt
+    collection: 'Startups', // Forces specific collection name
+    toJSON: { getters: true }, // Ensures teamSize getter runs on JSON output
+    toObject: { getters: true }
   }
 )
 
@@ -229,4 +233,4 @@ startupSchema.pre('save', function (next) {
 // Export the model (prevents OverwriteModelError)
 module.exports =
   mongoose.models.Startups ||
-  mongoose.model('Startups', startupSchema, 'Startups')
+  mongoose.model('Startups', startupSchema)
