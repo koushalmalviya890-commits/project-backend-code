@@ -1,11 +1,17 @@
 const express = require("express");
 const router = express.Router();
 
-const {protect} = require("../middlewares/authmiddleware");
+const protect = require("../middlewares/authmiddleware");
 
 const verifyWebhookSignature = require("../middlewares/verifyWebhookSignature");
 
-const BookingController = require("../controllers/BookingController");
+const {
+  createBooking,
+  getBookings,
+  getBookingById,
+  getFailedBooking,
+  updateBookingStatus
+} = require("../controllers/BookingController");
 
 // const {
 //   updateBookingStatusController,
@@ -65,24 +71,59 @@ const BookingController = require("../controllers/BookingController");
 // module.exports = router;
 
 
-// Booking status webhook (NO JWT AUTH)
-router.post("/update-status", verifyWebhookSignature, updateBookingStatusController);
+
+//debugging purpose
+// console.log("authMiddleware:", protect);
+// console.log("updateBookingStatusController:", updateBookingStatus);
+// console.log("createBookingController:", createBooking);
+// console.log("getBookingsController:", getBookings);
+// console.log("getBookingByIdController:", getBookingById);
+// console.log("getFailedBookingController:", getFailedBooking);
 
 
-// Create booking
-router.post("/", protect, createBookingController);
+
+// ----------------------------
+// Booking Status Webhook Route
+// (NO JWT, Only Signature Verification)
+// 
+router.post(
+  "/update-status",
+  verifyWebhookSignature,
+  updateBookingStatus
+);
 
 
-// List bookings
-router.get("/", protect, getBookingsController);
+// ----------------------------
+// Booking CRUD Routes
+// ----------------------------
 
+// Create Booking
+router.post(
+  "/",
+  protect,
+  createBooking
+);
 
-// Failed payments (STATIC route must come before :id)
-router.get("/failed", protect, getFailedBookingController);
+// List Bookings
+router.get(
+  "/",
+  protect,
+  getBookings
+);
 
+// Failed Payments (STATIC route MUST come before :id)
+router.get(
+  "/failed",
+  protect,
+  getFailedBooking
+);
 
-// Booking detail (DYNAMIC route LAST)
-router.get("/:id", protect, getBookingByIdController);
+// Booking Details (Dynamic route LAST)
+router.get(
+  "/:id",
+  protect,
+  getBookingById
+);
 
 
 module.exports = router;

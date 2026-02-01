@@ -16,3 +16,5 @@ function verifyWebhookSignature(req, res, next) {
 
   next();
 }
+
+module.exports= verifyWebhookSignature
