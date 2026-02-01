@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const Startup = require("../models/Startup");
-const ServiceProvider = require("../models/ServiceProvider"); // if exists
+const Startup = require("../src/models/Startup");
+const ServiceProvider = require("../src/models/ServiceProvider"); // if exists
 
 async function checkUser(userId, email) {
   const objectId = mongoose.Types.ObjectId.isValid(userId)

@@ -14,7 +14,7 @@ try {
 
 function generateSignature(payload, secret) {
   const body = JSON.stringify(payload);
-
+  
   return crypto
     .createHmac("sha256", secret)
     .update(body)

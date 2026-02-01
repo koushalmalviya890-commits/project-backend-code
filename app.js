@@ -27,7 +27,7 @@ const notificationRoutes = require("./src/routes/notificationRoutes");
 const bodyParser = require("body-parser");
 const multer = require("multer");
 
-<<<<<<< HEAD
+
 
 //Shivam added
 const sectorRoutes = require("./src/routes/SectorRoutes");
@@ -35,9 +35,9 @@ const bookingRoutes = require("./src/routes/BookingRoutes");
 
 const CronJobService = require('./services/cronJobService');
 
-=======
-const CronJobService = require("./src/services/cronJobService");
->>>>>>> dev
+
+const CronJobService = require("./services/cronJobService");
+
 
 // Initialize cron jobs
 const cronService = new CronJobService();

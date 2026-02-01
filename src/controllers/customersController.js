@@ -1,4 +1,4 @@
-const { getCustomersForProvider } = require("../services/customersService");
+const { getCustomersForProvider } = require("../../services/customersService");
 
 async function getCustomers(req, res) {
   try {
