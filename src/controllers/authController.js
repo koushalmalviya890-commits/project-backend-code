@@ -26,13 +26,20 @@ if (!process.env.JWT_SECRET) {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
+    let logoUrl = null;
+
     // Check Approval Status
     if (user.userType === 'Service Provider' || user.role === 'enabler') {
-      const profile = await ServiceProvider.findOne({ userId: user._id });
+      const profile = await ServiceProvider.findOne({ userId: user._id }).select('isApproved logoUrl');;
       if (!profile?.isApproved) return res.status(403).json({ message: "Pending approval" });
+    logoUrl = profile?.logoUrl || null;
+    }
+    else if (user.userType === 'startup') {
+      const profile = await Startup.findOne({ userId: user._id }).select('logoUrl');
+      logoUrl = profile?.logoUrl || null;
     }
 
-    const token = jwt.sign({ id: user._id, userType: user.userType }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id, userType: user.userType, logoUrl }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
     res.cookie('token', token, {
       httpOnly: true,
@@ -42,8 +49,9 @@ if (!process.env.JWT_SECRET) {
       path:'/',
     });
 
-    res.json({ user: { id: user._id, email: user.email, name: user.name, userType: user.userType } });
+    res.json({ user: { id: user._id, email: user.email, name: user.name, userType: user.userType, logoUrl: logoUrl } });
   } catch (error) {
+    console.error("Login Error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -88,7 +96,15 @@ exports.getMe = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select('-password');
     if (!user) return res.status(401).json({ message: "User not found" });
-    res.json({ user });
+   res.json({
+     user: {
+       id: user._id, // <--- This matches what your frontend expects
+       email: user.email,
+       name: user.name,
+       userType: user.userType,
+       // Add any other fields you need here
+     },
+   });
   } catch (err) {
     res.status(401).json({ message: "Invalid token" });
   }

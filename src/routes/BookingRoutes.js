@@ -25,12 +25,21 @@ const {
 
 // ---------------- ROUTES ----------------
 
+
 // console.log("authMiddleware:", protect);
 // console.log("updateBookingStatusController:", updateBookingStatusController);
 // console.log("createBookingController:", createBookingController);
 // console.log("getBookingsController:", getBookingsController);
 // console.log("getBookingByIdController:", getBookingByIdController);
 // console.log("getFailedBookingController:", getFailedBookingController);
+
+console.log("authMiddleware:", protect);
+console.log("updateBookingStatusController:", updateBookingStatusController);
+console.log("createBookingController:", createBookingController);
+console.log("getBookingsController:", getBookingsController);
+console.log("getBookingByIdController:", getBookingByIdController);
+console.log("getFailedBookingController:", getFailedBookingController);
+
 
 // Status update
 router.post("/update-status", protect, updateBookingStatusController);

@@ -1,4 +1,4 @@
-const bookingExtensionService = require("../services/bookingExtensionService");
+const bookingExtensionService = require("../../services/bookingExtensionService");
 
 async function createExtentBooking(req, res) {
   try {
@@ -26,7 +26,24 @@ async function getExtentBooking(req, res) {
   }
 }
 
+async function updateExtentBooking(req, res) {
+  try {
+    const { extensionId } = req.params;
+    const { status } = req.body;
+
+    const updated = await BookingExtension.findByIdAndUpdate(
+      extensionId,
+      { status },
+      { new: true },
+    );
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 module.exports = {
   createExtentBooking,
   getExtentBooking,
+  updateExtentBooking,
 };

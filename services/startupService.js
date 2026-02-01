@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
-const Startup = require("../models/Startup");
-const { connectDB } = require("../config/database");
+const Startup = require("../src/models/Startup");
+const { connectDB } = require("../src/config/database");
 
 async function getProfile(id) {
   const objectId = mongoose.Types.ObjectId.isValid(id)
@@ -48,7 +48,7 @@ async function getStartupBookings(userId) {
   const db = mongoose.connection.db;
 
   const bookings = await db
-    .collection("Bookings") 
+    .collection("Bookings")
     .find({ startupId: startup._id }) // IMPORTANT
     .sort({ createdAt: -1 })
     .toArray();

@@ -1,5 +1,6 @@
 // import jwt from 'jsonwebtoken';
 const jwt = require('jsonwebtoken');
+
 exports.protect = (req, res, next) => {
   const token = req.cookies.token; // Read the same cookie we set in login
 
