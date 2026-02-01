@@ -4,11 +4,11 @@ const { protect } = require('../middleware/authMiddleware.js'); // The middlewar
 const router = express.Router();
 
 // const authMiddleware = require("../middlewares/authmiddleware");
-const {
-  getStartupProfile,
-  updateStartupProfile,
-  getStartupBookings,
-} = require("../controllers/startupController");
+// const {
+//   getStartupProfile,
+//   updateStartupProfile,
+//   getStartupBookings,
+// } = require("../controllers/startupController");
 
 // router.get("/profile/:userId", getProfile);
 // router.patch("/profile/:userId", updateProfile);

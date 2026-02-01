@@ -1,31 +1,42 @@
 const express = require("express");
 const router = express.Router();
 
-const {protect} = require("../middleware/authMiddleware");
+const {protect} = require("../middlewares/authmiddleware");
 
-const {
-  updateBookingStatusController,
-} = require("../controllers/BookingController");
+const verifyWebhookSignature = require("../middlewares/verifyWebhookSignature");
 
-const {
-  createBookingController,
-} = require("../controllers/BookingCreateController");
+const BookingController = require("../controllers/BookingController");
 
-const {
-  getBookingsController,
-} = require("../controllers/BookingListController");
+// const {
+//   updateBookingStatusController,
+// } = require("../controllers/BookingController");
 
-const {
-  getBookingByIdController,
-} = require("../controllers/BookingDetailController");
+// const {
+//   createBookingController,
+// } = require("../controllers/BookingCreateController");
 
-const {
-  getFailedBookingController,
-} = require("../controllers/BookingFailedController");
+// const {
+//   getBookingsController,
+// } = require("../controllers/BookingListController");
 
-// ---------------- ROUTES ----------------
+// const {
+//   getBookingByIdController,
+// } = require("../controllers/BookingDetailController");
+
+// const {
+//   getFailedBookingController,
+// } = require("../controllers/BookingFailedController");
+
+// // ---------------- ROUTES ----------------
 
 
+
+// // console.log("authMiddleware:", protect);
+// // console.log("updateBookingStatusController:", updateBookingStatusController);
+// // console.log("createBookingController:", createBookingController);
+// // console.log("getBookingsController:", getBookingsController);
+// // console.log("getBookingByIdController:", getBookingByIdController);
+// // console.log("getFailedBookingController:", getFailedBookingController);
 
 // console.log("authMiddleware:", protect);
 // console.log("updateBookingStatusController:", updateBookingStatusController);
@@ -34,28 +45,50 @@ const {
 // console.log("getBookingByIdController:", getBookingByIdController);
 // console.log("getFailedBookingController:", getFailedBookingController);
 
-console.log("authMiddleware:", protect);
-console.log("updateBookingStatusController:", updateBookingStatusController);
-console.log("createBookingController:", createBookingController);
-console.log("getBookingsController:", getBookingsController);
-console.log("getBookingByIdController:", getBookingByIdController);
-console.log("getFailedBookingController:", getFailedBookingController);
 
 
+// // Status update
+// router.post("/update-status", protect, updateBookingStatusController);
 
-// Status update
-router.post("/update-status", protect, updateBookingStatusController);
+// // Create booking
+// router.post("/", protect, createBookingController);
+
+// // List bookings
+// router.get("/", protect, getBookingsController);
+
+// // Failed payments (MUST COME BEFORE :id)
+// router.get("/failed", protect, getFailedBookingController);
+
+// // Booking detail (LAST)
+// router.get("/:id", protect, getBookingByIdController);
+
+// module.exports = router;
+
+
+// Booking status webhook (NO JWT AUTH)
+router.post("/update-status", verifyWebhookSignature, updateBookingStatusController);
+
 
 // Create booking
 router.post("/", protect, createBookingController);
 
+
 // List bookings
 router.get("/", protect, getBookingsController);
 
-// Failed payments (MUST COME BEFORE :id)
+
+// Failed payments (STATIC route must come before :id)
 router.get("/failed", protect, getFailedBookingController);
 
-// Booking detail (LAST)
+
+// Booking detail (DYNAMIC route LAST)
 router.get("/:id", protect, getBookingByIdController);
 
+
 module.exports = router;
+
+
+
+
+
+
