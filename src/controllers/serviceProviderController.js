@@ -72,6 +72,8 @@ exports.getServiceProviderProfile = async (req, res) => {
       invoiceTemplate: profile.invoiceTemplate || 'template1',
       settlementType: profile.settlementType || 'monthly',
       gstNumber: profile.gstNumber || '',
+      stateProvince: profile.state || profile.stateProvince, 
+  zipPostalCode: profile.pincode || profile.zipPostalCode,
       timings: profile.timings || {
         monday: { isOpen: false },
         tuesday: { isOpen: false },

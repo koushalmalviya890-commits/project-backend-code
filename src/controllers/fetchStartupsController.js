@@ -69,3 +69,8 @@ exports.removeCustomer = async (req, res) => {
     res.status(500).json({ message: "Failed to remove startup" });
   }
 };
+
+
+
+//trislllllllllllllllllllllllllllllllllllllllllllllllllllllllllll
+// lllllllllllllllllllllll"?
