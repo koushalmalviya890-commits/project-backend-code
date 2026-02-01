@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const { 
@@ -18,5 +19,7 @@ router.delete('/', removeCustomer); // Remove from list
 // 2. Search Logic (New Endpoint)
 // Usage: GET /api/customers/search?emailDomain=example.com
 router.get('/search', searchStartups); 
+
+// router.get("/customers/:providerUserId", getCustomers);
 
 module.exports = router;

@@ -3,8 +3,10 @@ const router = express.Router();
 const { 
   createFacility, 
   getFacilities, 
+  getFacilityById, // New
   deleteFacility, 
-  updateFacility 
+  updateFacility,
+  updateFacilityStatus
 } = require('../controllers/facilityController');
 const { protect } = require('../middleware/authMiddleware'); // Your auth middleware
 
@@ -13,8 +15,10 @@ router.use(protect);
 
 // Routes
 router.post('/', createFacility);        // Create
-router.get('/', getFacilities);          // Read All
+router.get('/', getFacilities);   
+router.get('/:id', getFacilityById);
 router.delete('/:id', deleteFacility);   // Delete
 router.patch('/:id', updateFacility);    // Update
+router.patch('/:id/status', updateFacilityStatus); // ✅ New Status Route
 
 module.exports = router;

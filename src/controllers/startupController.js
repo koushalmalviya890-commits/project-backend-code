@@ -3,8 +3,6 @@
 const mongoose = require('mongoose');
 const startupService = require("../../services/startupService");
 const Startup = require("../models/Startup");
-
-
 exports.getStartupProfile = async (req, res) => {
   try {
     // req.user is populated by our 'protect' middleware
