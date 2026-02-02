@@ -3,13 +3,6 @@ const { getStartupProfile, updateStartupProfile, getStartupBookings } = require(
 const { protect } = require('../middleware/authMiddleware.js'); // The middleware we wrote earlier
 const router = express.Router();
 
-// const authMiddleware = require("../middlewares/authmiddleware");
-const {
-  getStartupProfile,
-  updateStartupProfile,
-  getStartupBookings,
-} = require("../controllers/startupController");
-
 // router.get("/profile/:userId", getProfile);
 // router.patch("/profile/:userId", updateProfile);
 

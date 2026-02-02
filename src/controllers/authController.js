@@ -1,15 +1,114 @@
-// import bcrypt from 'bcryptjs';
 const bcrypt = require('bcryptjs');
-//  import jwt from 'jsonwebtoken';
 const jwt = require('jsonwebtoken');
-// import jwt from 'jsonwebtoken';
 const User = require("../models/User"); // Ensure you copy your User model from Nextjs to here
 const ServiceProvider = require("../models/ServiceProvider"); // Copy this model too
 const Startup = require("../models/Startup");
+const crypto = require('crypto');
+const { z } = require('zod');
+const nodemailer = require('nodemailer');
+const path = require('path');
 // import AffiliateLinkUser from '../models/AffiliateLinkUsers.js';
 // import crypto from 'crypto';
 // 3. REGISTER STARTUP (Detailed Signup)
 
+
+const resetPasswordSchema = z.object({
+  email: z.string().email({ message: 'Invalid email address' }),
+  otp: z.string().length(6, { message: 'OTP must be 6 digits' }).regex(/^\d{6}$/, { message: 'OTP must be numbers only' }),
+  newPassword: z.string().min(8, { message: 'Password must be at least 8 characters' }),
+  action: z.literal('reset_password')
+});
+
+const generateToken = () => {
+  return crypto.randomBytes(32).toString('hex');
+};
+const requestOtpSchema = z.object({
+  email: z.string().email({ message: 'Invalid email address' }),
+  action: z.literal('request_otp')
+});
+
+const verifyOtpSchema = z.object({
+  email: z.string().email({ message: 'Invalid email address' }),
+  otp: z.string().length(6, { message: 'OTP must be 6 digits' }).regex(/^\d{6}$/, { message: 'OTP must be numbers only' }),
+  action: z.literal('verify_otp')
+});
+
+const updatePasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const createEmailTransporter = () => {
+  return nodemailer.createTransport({
+    host: 'smtppro.zoho.in', // Check your provider details
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
+    }
+  });
+};
+
+const sendOTPEmail = async (email, otp) => {
+  const transporter = createEmailTransporter();
+  
+  // Note: Ensure the path to logo.png is correct for your Express server structure
+  // Usually 'path' should be relative to where you run the server script
+const logoPath = path.join(__dirname, '../../public/logo.png');
+
+
+  const mailOptions = {
+    from: `"Cumma," <${process.env.EMAIL_FROM}>`,
+    to: email,
+    subject: 'Password Reset OTP - Expires in 5 minutes',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <img src="cid:emailLogo" alt="Brand Logo" style="height: 60px;" />
+        </div>
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h2 style="color: #333; margin-bottom: 10px;">Password Reset Request</h2>
+          <p style="color: #666; font-size: 16px;">
+            You've requested to reset your password. Use the OTP below to proceed.
+          </p>
+        </div>
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px; margin: 30px 0;">
+          <div style="background: white; padding: 20px; border-radius: 8px; display: inline-block;">
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #333; font-family: 'Courier New', monospace;">
+              ${otp}
+            </div>
+          </div>
+        </div>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc3545; margin-bottom: 20px;">
+          <p style="margin: 0; color: #721c24; font-weight: 500;">
+            ⚠️ <strong>Important:</strong> This OTP expires in 5 minutes.<br/>
+            Do not share it with anyone for any reason.
+          </p>
+        </div>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+          <p style="color: #666; font-size: 14px; margin: 0;">
+            If you didn’t request a password reset, please ignore this email.
+          </p>
+        </div>
+      </div>
+    `,
+    attachments: [
+      {
+        filename: 'logo.png',
+        path: logoPath,
+        cid: 'emailLogo'
+      }
+    ]
+  };
+
+  await transporter.sendMail(mailOptions);
+};
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
@@ -197,7 +296,267 @@ exports.completeProfile = async (req, res) => {
 };
 
 
+exports.requestPasswordReset = async (req, res) => {
+  try {
+const validatedData = resetPasswordSchema.parse(req.body);
+    const { email } = validatedData;
 
+    // Basic Validation
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // 1. Find the user
+    const user = await User.findOne({ email });
+
+    // 2. Even if user doesn't exist, return success to prevent email enumeration (Security Best Practice)
+    if (!user) {
+      return res.status(200).json({ 
+        message: 'If your email is in our system, you will receive password reset instructions shortly.' 
+      });
+    }
+
+    // 3. Generate token and expiry (24 hours from now)
+    const resetToken = generateToken();
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // 4. Update user with reset token information
+    await User.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          resetToken,
+          resetTokenExpiry
+        } 
+      }
+    );
+
+    // 5. Construct the Link
+    // Ensure APP_URL or FRONTEND_URL is set in your .env, otherwise fallback to localhost
+    const appUrl = 'http://localhost:3000' || process.env.FRONTEND_URL;
+    const resetLink = `${appUrl}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+
+    // 6. Log the link (Since we aren't sending real emails yet)
+    console.log('Password reset link:', resetLink);
+
+    // 7. Return success response
+    return res.status(200).json({ 
+      message: 'If your email is in our system, you will receive password reset instructions shortly.' 
+    });
+
+  }catch (error) {
+    console.error('Password reset request error:', error);
+
+    // H. Handle Zod Validation Errors specificially
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: 'Invalid input data',
+        details: error.errors // Optional: send back specific validation issues
+      });
+    }
+
+    return res.status(500).json({ error: 'Failed to process password reset request' });
+  }
+};
+
+exports.handleDirectPasswordReset = async (req, res) => {
+  try {
+    const { action } = req.body;
+
+    switch (action) {
+      case 'request_otp':
+        return await handleOTPRequest(req, res);
+      case 'verify_otp':
+        return await handleOTPVerification(req, res);
+      case 'reset_password':
+        return await handlePasswordReset(req, res);
+      default:
+        return res.status(400).json({ error: 'Invalid action' });
+    }
+  } catch (error) {
+    console.error('Password reset error:', error);
+    if (error instanceof z.ZodError) {
+      const errorMessages = error.errors.map(err => err.message).join(', ');
+      return res.status(400).json({ error: errorMessages });
+    }
+    return res.status(500).json({ error: 'Failed to process request' });
+  }
+};
+
+exports.updatePassword = async (req, res) => {
+  try {
+    // 1. Validate Input
+    const validatedData = updatePasswordSchema.parse(req.body);
+    const { token, email, password } = validatedData;
+
+    // 2. Find the user
+    // Criteria: Email matches, Token matches, and Token is NOT expired
+    const user = await User.findOne({
+      email,
+      resetToken: token,
+      resetTokenExpiry: { $gt: new Date() } 
+    });
+
+    // 3. Handle Invalid/Expired Token
+    if (!user) {
+      return res.status(400).json({ 
+        error: 'Invalid or expired password reset link' 
+      });
+    }
+
+    // 4. Hash the new password
+    // Note: We hash manually here because we are using updateOne below, 
+    // which skips the Mongoose 'pre-save' hook.
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 5. Update user
+    await User.updateOne(
+      { _id: user._id },
+      { 
+        $set: { 
+          password: hashedPassword
+        },
+        $unset: { 
+          resetToken: "", 
+          resetTokenExpiry: "" 
+        }
+      }
+    );
+
+    // 6. Return Success
+    res.status(200).json({ 
+      message: 'Password has been successfully updated' 
+    });
+
+  } catch (error) {
+    console.error('Password update error:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        error: 'Invalid input data', 
+        details: error.errors 
+      });
+    }
+
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+};
+
+// --- Sub-Handlers ---
+
+async function handleOTPRequest(req, res) {
+  const validatedData = requestOtpSchema.parse(req.body);
+  const { email } = validatedData;
+
+  const user = await User.findOne({ email }).select('+resetOTP +resetOTPCreatedAt +resetOTPExpiry');
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Email not found. Please register first.' });
+  }
+
+  const otp = generateOTP();
+  const now = new Date();
+  const otpExpiry = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+
+  // Direct DB update to set OTP fields
+  await User.findByIdAndUpdate(user._id, {
+    resetOTP: otp,
+    resetOTPCreatedAt: now,
+    resetOTPExpiry: otpExpiry
+  });
+
+  try {
+    await sendOTPEmail(email, otp);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔐 OTP for ${email}: ${otp}`);
+    }
+  } catch (emailError) {
+    console.error('❌ Failed to send OTP email:', emailError);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'OTP generation succeeded but email failed. Please try again.' 
+    });
+  }
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'OTP sent successfully. Please check your email.' 
+  });
+}
+
+async function handleOTPVerification(req, res) {
+  const validatedData = verifyOtpSchema.parse(req.body);
+  const { email, otp } = validatedData;
+
+  const user = await User.findOne({ email }).select('+resetOTP +resetOTPCreatedAt +resetOTPExpiry');
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  if (!user.resetOTP || !user.resetOTPCreatedAt) {
+    return res.status(400).json({ success: false, error: 'No OTP found. Please request a new OTP.' });
+  }
+
+  // Use model method isOTPExpired
+  if (user.isOTPExpired()) {
+    await User.findByIdAndUpdate(user._id, {
+      $unset: { resetOTP: 1, resetOTPCreatedAt: 1, resetOTPExpiry: 1 }
+    });
+    return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new OTP.' });
+  }
+
+  // Use model method isOTPValid
+  if (!user.isOTPValid(otp)) {
+    return res.status(400).json({ success: false, error: 'Invalid OTP. Please check and try again.' });
+  }
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'OTP verified successfully. You can now reset your password.' 
+  });
+}
+
+async function handlePasswordReset(req, res) {
+  const validatedData = resetPasswordSchema.parse(req.body);
+  const { email, otp, newPassword } = validatedData;
+
+  const user = await User.findOne({ email }).select('+resetOTP +resetOTPCreatedAt +resetOTPExpiry');
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
+
+  if (!user.resetOTP || !user.resetOTPCreatedAt) {
+    return res.status(400).json({ success: false, error: 'No valid OTP found. Please request a new OTP.' });
+  }
+
+  if (user.isOTPExpired()) {
+    await User.findByIdAndUpdate(user._id, {
+      $unset: { resetOTP: 1, resetOTPCreatedAt: 1, resetOTPExpiry: 1 }
+    });
+    return res.status(400).json({ success: false, error: 'OTP has expired. Please request a new OTP.' });
+  }
+
+  if (!user.isOTPValid(otp)) {
+    return res.status(400).json({ success: false, error: 'Invalid OTP. Please verify your OTP first.' });
+  }
+
+  // Hash new password
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+  // Update password and clear OTP
+  await User.findByIdAndUpdate(user._id, {
+    password: hashedPassword,
+    $unset: { resetOTP: 1, resetOTPCreatedAt: 1, resetOTPExpiry: 1 }
+  });
+
+  return res.status(200).json({ 
+    success: true, 
+    message: 'Password has been reset successfully. You can now login with your new password.' 
+  });
+}
 
 
 // exports.completeProfile = async (req, res) => {

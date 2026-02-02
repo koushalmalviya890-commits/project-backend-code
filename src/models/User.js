@@ -66,6 +66,14 @@ const UserSchema = new Schema(
       type: Date,
       select: false,
     },
+    resetToken: {
+      type: String,
+      select: false, // Security: Don't return this in queries by default
+    },
+    resetTokenExpiry: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: true,
