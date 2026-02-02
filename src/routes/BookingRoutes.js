@@ -3,7 +3,7 @@ const router = express.Router();
 
 const protect = require("../middlewares/authmiddleware");
 
-const verifyWebhookSignature = require("../middlewares/verifyWebhookSignature");
+const verifyWebhookSignature = require("../middleware/verifyWebhookSignature");
 
 const {
   createBooking,
