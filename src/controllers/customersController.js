@@ -1,6 +1,10 @@
+
+const { getCustomersForProvider } = require("../../services/customersService");
+
 const FacilityStartups = require("../models/FacilityStartups");
 const Startup = require("../models/Startup"); // Ensure you have this model
 const mongoose = require("mongoose");
+
 
 // --- 1. GET MY CUSTOMERS (Mapped Startups) ---
 // Matches the first Next.js file logic

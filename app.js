@@ -27,6 +27,11 @@ const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
+
+
+
+
+//Shivam added
 const sectorRoutes = require("./src/routes/SectorRoutes");
 const bookingRoutes = require("./src/routes/BookingRoutes");
 //const mapRoutes = require("./src/routes/mapRoutes");
@@ -41,6 +46,13 @@ const bookingRoutes = require("./src/routes/BookingRoutes");
 // const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const bodyParser = require("body-parser");
 const CronJobService = require("./services/cronJobService");
+
+
+//const CronJobService = require('./services/cronJobService');
+
+
+//const CronJobService = require("./services/cronJobService");
+
 
 
 // Initialize cron jobs
@@ -137,10 +149,12 @@ app.use("/api/bookings", bookingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/affiliate', affiliateRoutes); // Affiliate routes
 app.use('/api/service-provider', serviceProviderRoutes); // Service Provider routes
+
 app.use("/api/maps", mapRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 app.use('/api/facilities', facilityRoutes)
 app.use("/api/customers", customersRoutes);
 app.use("/api/reviews", reviewsRoutes); // Reviews routes
@@ -149,6 +163,7 @@ app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 // app.use("/api/startup", startupRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
+
 
 // ---------------------------
 // Error handling

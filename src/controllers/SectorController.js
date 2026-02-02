@@ -1,4 +1,4 @@
-//import Sector from "../models/Sector.js";
+          //import Sector from "../models/Sector.js";
 
 const Sector = require("../models/Sector.js");
 
