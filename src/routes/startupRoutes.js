@@ -1,17 +1,7 @@
 const express = require('express');
 const { getStartupProfile, updateStartupProfile, getStartupBookings } = require('../controllers/startupController');
-const { protect } = require('../middleware/authMiddleware.js'); // The middleware we wrote earlier
+const { protect } = require('../middleware/authMiddleware.js'); 
 const router = express.Router();
-
-// const authMiddleware = require("../middlewares/authmiddleware");
-const {
-  getStartupProfile,
-  updateStartupProfile,
-  getStartupBookings,
-} = require("../controllers/startupController");
-
-// router.get("/profile/:userId", getProfile);
-// router.patch("/profile/:userId", updateProfile);
 
 router.get('/profile', protect, getStartupProfile);
 router.patch('/profile', protect, updateStartupProfile);
