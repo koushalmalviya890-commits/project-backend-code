@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware"); // Import Protect
+const { protect } = require("../middleware/authMiddleware"); 
 
 const { checkUserController } = require("../controllers/checkUserController");
 router.post("/checkuser", protect, checkUserController);
