@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const protect = require("../middlewares/authmiddleware");
+const{ protect }= require("../middleware/authMiddleware");
 
 const verifyWebhookSignature = require("../middleware/verifyWebhookSignature");
 

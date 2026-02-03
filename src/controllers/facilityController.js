@@ -491,3 +491,98 @@ exports.updateFacilityStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update facility status' });
   }
 };
+
+exports.getFacilitiesByProvider = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Validate ID
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid or missing Service Provider ID' });
+    }
+
+    const serviceProviderId = new mongoose.Types.ObjectId(id);
+
+    // 2. Run Aggregation
+    // We use the Mongoose model 'Facility' to start the aggregation
+    const facilities = await Facility.aggregate([
+      {
+        $match: {
+          serviceProviderId: serviceProviderId,
+          status: 'active',
+        }
+      },
+      {
+        $lookup: {
+          // IMPORTANT: Check your actual MongoDB collection name for Service Providers.
+          // The Next.js code used 'Service Provider'. Mongoose usually lowercases/pluralizes (e.g., 'serviceproviders').
+          // If your DB collection specifically has a space, keep 'Service Provider'.
+          // If you created the collection via Mongoose defaults, try 'serviceproviders'.
+          // I will stick to your Next.js input 'Service Provider' for safety.
+          from: 'Service Provider', 
+          localField: 'serviceProviderId',
+          foreignField: 'userId',
+          as: 'serviceProviderDetails'
+        }
+      },
+      {
+        $addFields: {
+          serviceProvider: {
+            serviceName: {
+              $cond: {
+                if: { $gt: [{ $size: '$serviceProviderDetails' }, 0] },
+                then: { $arrayElemAt: ['$serviceProviderDetails.serviceName', 0] },
+                else: 'Unknown Provider'
+              }
+            },
+            serviceProviderType: {
+              $cond: {
+                if: { $gt: [{ $size: '$serviceProviderDetails' }, 0] },
+                then: { $arrayElemAt: ['$serviceProviderDetails.serviceProviderType', 0] },
+                else: null
+              }
+            },
+            features: {
+              $cond: {
+                if: { $gt: [{ $size: '$serviceProviderDetails' }, 0] },
+                then: { $arrayElemAt: ['$serviceProviderDetails.features', 0] },
+                else: []
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          serviceProviderId: 1,
+          facilityType: 1,
+          status: 1,
+          details: 1,
+          features: 1,
+          address: 1,
+          city: 1,
+          pincode: 1,
+          state: 1,
+          country: 1,
+          isFeatured: 1,
+          updatedAt: 1,
+          serviceProvider: 1
+        }
+      },
+      {
+        $sort: {
+          isFeatured: -1,
+          updatedAt: -1
+        }
+      }
+    ]);
+
+    // 3. Return Response
+    res.json(facilities);
+
+  } catch (error) {
+    console.error('Error fetching facilities by provider:', error);
+    res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  }
+};

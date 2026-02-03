@@ -7,6 +7,8 @@ const cors = require("cors");
 const path = require("path");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const bodyParser = require("body-parser");
 const corsOptions = require("./src/config/corsOption");
 const eventDetailRoutes = require("./src/routes/eventDetailRoutes");
 const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
@@ -22,10 +24,10 @@ const facilityRoutes = require("./src/routes/facilityRoutes");
 const reviewsRoutes = require("./src/routes/reviewsRoutes");
 const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
-const cookieParser = require("cookie-parser");
+// const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const multer = require("multer");
 
-
+const pricingRoutes = require("./src/routes/pricingRoutes");
 
 
 //Shivam added
@@ -33,7 +35,7 @@ const sectorRoutes = require("./src/routes/SectorRoutes");
 const bookingRoutes = require("./src/routes/BookingRoutes");
 const uploadRoutes = require("./src/routes/uploadRoutes");
 const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
-const bodyParser = require("body-parser");
+
 const CronJobService = require("./services/cronJobService");
 
 
@@ -42,17 +44,18 @@ const CronJobService = require("./services/cronJobService");
 
 //const CronJobService = require("./services/cronJobService");
 
-
+const app = express();
 
 // Initialize cron jobs
 const cronService = new CronJobService();
-const app = express();
+
 
 // ---------------------------
 // Basic middleware
 // ---------------------------
-app.use(cors(corsOptions));
+
 app.use(helmet());
+app.use(cors(corsOptions));
 app.use(cookieParser());
 
 
@@ -143,7 +146,7 @@ app.use("/api/maps", mapRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", checkUserRoutes);
 app.use("/api/notifications", notificationRoutes);
-
+app.use("/api/pricing", pricingRoutes);
 app.use('/api/facilities', facilityRoutes)
 app.use("/api/customers", customersRoutes);
 app.use("/api/reviews", reviewsRoutes); // Reviews routes
@@ -152,7 +155,7 @@ app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 // app.use("/api/startup", startupRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
-
+// app.use("/api", facilityBookingRoutes)
 
 // ---------------------------
 // Error handling
