@@ -2,49 +2,6 @@ const ServiceProvider = require("../models/ServiceProvider");
 const mongoose = require("mongoose");
 const Booking = require('../models/Booking');
 
-
-
-// function getFixedServiceFee(facilityType) {
-//   if (!facilityType) return 30; // Default safety
-//   const normalizedType = facilityType.toLowerCase().trim();
-
-//   // 40Rs Tier
-//   if (
-//     normalizedType.includes('individual-cabin') || 
-//     normalizedType.includes('individual cabin') ||
-//     normalizedType.includes('coworking') || 
-//     normalizedType.includes('raw space office') ||
-//     normalizedType.includes('raw-space-office')
-//   ) {
-//     return 40;
-//   }
-  
-//   // 10Rs Tier
-//   if (
-//     normalizedType.includes('bio-allied') || 
-//     normalizedType.includes('bio allied') ||
-//     normalizedType.includes('manufacturing') || 
-//     normalizedType.includes('prototyping') ||
-//     normalizedType.includes('software') || 
-//     normalizedType.includes('saas') ||
-//     normalizedType.includes('raw space lab') ||
-//     normalizedType.includes('raw-space-lab')
-//   ) {
-//     return 10;
-//   }
-  
-//   // 50Rs Tier
-//   if (
-//     normalizedType.includes('studio') || 
-//     normalizedType.includes('meeting')
-//   ) {
-//     return 50;
-//   }
-  
-//   // Default Tier
-//   return 30;
-// }
-
 // --- GET PROFILE ---
 exports.getServiceProviderProfile = async (req, res) => {
   try {
@@ -73,7 +30,7 @@ exports.getServiceProviderProfile = async (req, res) => {
       settlementType: profile.settlementType || 'monthly',
       gstNumber: profile.gstNumber || '',
       stateProvince: profile.state || profile.stateProvince, 
-  zipPostalCode: profile.pincode || profile.zipPostalCode,
+      zipPostalCode: profile.pincode || profile.zipPostalCode,
       timings: profile.timings || {
         monday: { isOpen: false },
         tuesday: { isOpen: false },
@@ -283,5 +240,203 @@ exports.getEarnings = async (req, res) => {
   } catch (error) {
     console.error('Error in earnings API:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.getServiceProviderById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid provider ID' });
+    }
+
+    // 2. Find Provider (By _id OR userId)
+    // Matches Next.js logic: { $or: [ { _id: ... }, { userId: ... } ] }
+    const serviceProvider = await ServiceProvider.findOne({
+      $or: [
+        { _id: id },
+        { userId: id }
+      ]
+    }).lean();
+
+    if (!serviceProvider) {
+      return res.status(404).json({ error: 'Service provider not found' });
+    }
+
+    // 3. Return Data
+    res.status(200).json(serviceProvider);
+
+  } catch (error) {
+    console.error('Error fetching service provider details:', error);
+    res.status(500).json({ error: 'Failed to fetch service provider details' });
+  }
+};
+
+exports.getAllServiceProvidersWithStats = async (req, res) => {
+  try {
+    // 1. Fetch All Service Providers
+    const serviceProviders = await ServiceProvider.find({})
+      .select('_id userId serviceName address logoUrl features images serviceProviderType city stateProvince zipPostalCode timings')
+      .lean();
+
+    // 2. Fetch Active Public Facilities
+    // We get all facilities linked to these providers
+    const providerUserIds = serviceProviders.map(p => p.userId).filter(Boolean);
+    
+    const allFacilities = await Facility.find({
+      status: 'active',
+      privacyType: 'public',
+      serviceProviderId: { $in: providerUserIds }
+    }).lean();
+
+    // 3. Calculate Stats (In-Memory Aggregation)
+    // Create maps to count facilities per provider
+    const facilityCountMap = new Map(); // providerId -> count
+    const facilityTypesMap = new Map(); // providerId -> Map<type, count>
+
+    allFacilities.forEach(facility => {
+      const providerId = facility.serviceProviderId.toString();
+
+      // Count Total
+      facilityCountMap.set(providerId, (facilityCountMap.get(providerId) || 0) + 1);
+
+      // Group by Type
+      if (!facilityTypesMap.has(providerId)) {
+        facilityTypesMap.set(providerId, new Map());
+      }
+      const providerTypes = facilityTypesMap.get(providerId);
+      const type = facility.facilityType;
+      providerTypes.set(type, (providerTypes.get(type) || 0) + 1);
+    });
+
+    // 4. Merge Data & Format Response
+    const providersWithFacilities = serviceProviders.map(provider => {
+      const providerId = provider.userId ? provider.userId.toString() : '';
+      const totalFacilities = facilityCountMap.get(providerId) || 0;
+      const facilityTypes = facilityTypesMap.get(providerId);
+
+      // Format Facility Types Array
+      const facilityTypesArray = facilityTypes 
+        ? Array.from(facilityTypes).map(([type, count]) => {
+            // Helper to format display name
+            let displayType = type;
+            switch (type) {
+              case 'individual-cabin': displayType = 'Individual Cabin'; break;
+              case 'coworking-spaces': displayType = 'Coworking Space'; break;
+              case 'meeting-rooms': displayType = 'Meeting Room'; break;
+              case 'bio-allied-labs': displayType = 'Bio Allied Lab'; break;
+              case 'manufacturing-labs': displayType = 'Manufacturing Lab'; break;
+              case 'prototyping-labs': displayType = 'Prototyping Lab'; break;
+              case 'raw-space-office': displayType = 'Raw Space Office'; break;
+              case 'raw-space-lab': displayType = 'Raw Space Lab'; break;
+              // Add other cases as needed...
+              default: 
+                // Fallback capitalization
+                displayType = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            }
+            return { type: displayType, count, originalType: type };
+          }).sort((a, b) => b.count - a.count)
+        : [];
+
+      // Format Address
+      let fullAddress = provider.address || '';
+      if (provider.city) fullAddress += (fullAddress ? ', ' : '') + provider.city;
+      if (provider.stateProvince) fullAddress += (fullAddress ? ', ' : '') + provider.stateProvince;
+      if (provider.zipPostalCode) fullAddress += (fullAddress ? ' - ' : '') + provider.zipPostalCode;
+
+      return {
+        _id: provider._id,
+        serviceName: provider.serviceName,
+        address: fullAddress,
+        logoUrl: provider.logoUrl,
+        serviceProviderType: provider.serviceProviderType,
+        features: Array.isArray(provider.features) ? provider.features : [],
+        images: Array.isArray(provider.images) ? provider.images : [],
+        timings: provider.timings,
+        facilityTypes: facilityTypesArray,
+        totalFacilities
+      };
+    });
+
+    res.json({ success: true, providers: providersWithFacilities });
+
+  } catch (error) {
+    console.error('Error fetching service providers:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch service providers' });
+  }
+};
+
+
+/**
+ * 2. GET FACILITIES FOR A SPECIFIC PROVIDER (PAGINATED)
+ * Migrated from: GET /api/service-providers/[id]/facilities
+ */
+exports.getProviderFacilitiesWithPagination = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid provider ID' });
+    }
+
+    // 1. Find Service Provider (using _id)
+    // Note: The ID in params is usually the _id of the Service Provider Document
+    const serviceProvider = await ServiceProvider.findById(id).lean();
+
+    if (!serviceProvider) {
+      return res.status(404).json({ error: 'Service provider not found' });
+    }
+
+    // 2. Determine Filter Query
+    // Facilities are linked via 'serviceProviderId' which matches the provider's 'userId'
+    // Fallback to _id if userId is missing (legacy data safety)
+    const providerUserId = serviceProvider.userId ? serviceProvider.userId : serviceProvider._id;
+
+    const query = {
+      serviceProviderId: providerUserId,
+      status: 'active',
+      privacyType: 'public'
+    };
+
+    // 3. Count Total Documents (for Pagination)
+    const totalCount = await Facility.countDocuments(query);
+
+    // 4. Fetch Paginated Facilities
+    const facilities = await Facility.find(query)
+      .sort({ isFeatured: -1, updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // 5. Attach Provider Info to each Facility (Frontend expects this structure)
+    const facilitiesWithProvider = facilities.map(facility => ({
+      ...facility,
+      serviceProvider: {
+        serviceName: serviceProvider.serviceName,
+        serviceProviderType: serviceProvider.serviceProviderType,
+        features: serviceProvider.features || []
+      }
+    }));
+
+    // 6. Return Response
+    res.json({
+      facilities: facilitiesWithProvider,
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+        hasMore: page < Math.ceil(totalCount / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching provider facilities:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 };
