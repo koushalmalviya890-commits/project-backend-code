@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const{ protect }= require("../middleware/authMiddleware");
+const { protect } = require("../middleware/authMiddleware");
 
 const verifyWebhookSignature = require("../middleware/verifyWebhookSignature");
 
@@ -10,8 +10,28 @@ const {
   getBookings,
   getBookingById,
   getFailedBooking,
-  updateBookingStatus
+  updateBookingStatus,
 } = require("../controllers/BookingController");
+
+router.post("/update-status", verifyWebhookSignature, updateBookingStatus);
+
+// ----------------------------
+// Booking CRUD Routes
+// ----------------------------
+
+// Create Booking
+router.post("/", protect, createBooking);
+
+// List Bookings
+router.get("/", protect, getBookings);
+
+// Failed Payments (STATIC route MUST come before :id)
+router.get("/failed", protect, getFailedBooking);
+
+// Booking Details (Dynamic route LAST)
+router.get("/:id", protect, getBookingById);
+
+module.exports = router;
 
 // const {
 //   updateBookingStatusController,
@@ -35,8 +55,6 @@ const {
 
 // // ---------------- ROUTES ----------------
 
-
-
 // // console.log("authMiddleware:", protect);
 // // console.log("updateBookingStatusController:", updateBookingStatusController);
 // // console.log("createBookingController:", createBookingController);
@@ -50,8 +68,6 @@ const {
 // console.log("getBookingsController:", getBookingsController);
 // console.log("getBookingByIdController:", getBookingByIdController);
 // console.log("getFailedBookingController:", getFailedBookingController);
-
-
 
 // // Status update
 // router.post("/update-status", protect, updateBookingStatusController);
@@ -70,8 +86,6 @@ const {
 
 // module.exports = router;
 
-
-
 //debugging purpose
 // console.log("authMiddleware:", protect);
 // console.log("updateBookingStatusController:", updateBookingStatus);
@@ -80,56 +94,7 @@ const {
 // console.log("getBookingByIdController:", getBookingById);
 // console.log("getFailedBookingController:", getFailedBooking);
 
-
-
 // ----------------------------
 // Booking Status Webhook Route
 // (NO JWT, Only Signature Verification)
-// 
-router.post(
-  "/update-status",
-  verifyWebhookSignature,
-  updateBookingStatus
-);
-
-
-// ----------------------------
-// Booking CRUD Routes
-// ----------------------------
-
-// Create Booking
-router.post(
-  "/",
-  protect,
-  createBooking
-);
-
-// List Bookings
-router.get(
-  "/",
-  protect,
-  getBookings
-);
-
-// Failed Payments (STATIC route MUST come before :id)
-router.get(
-  "/failed",
-  protect,
-  getFailedBooking
-);
-
-// Booking Details (Dynamic route LAST)
-router.get(
-  "/:id",
-  protect,
-  getBookingById
-);
-
-
-module.exports = router;
-
-
-
-
-
-
+//
