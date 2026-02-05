@@ -1,11 +1,12 @@
 const mongoose = require("mongoose");
-const { verifyPaymentSignature } = require("../../utils/razorpay");
-
-
 // controllers/paymentController.js
 const Razorpay = require('razorpay');
 const Booking = require('../models/Booking'); 
 const Facility = require('../models/Facility');
+const Startup = require('../models/Startup');
+const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
+const Notification = require('../models/Notification'); // Ensure y
+const { verifyPaymentSignature } = require("../../utils/razorpay");
 
 
 // Initialize Razorpay
@@ -167,14 +168,20 @@ exports.createRazorpayOrder = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized: Only startups can book facilities' });
     }
 
+    const userId = user._id || user.id;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID not found in request' });
+    }
+
     // 2. Extract Data from Request Body
     // Note: We ignore 'bookingId' from body because we will create/find it here
-    const {
+const {
       facilityId, rentalPlan, unitCount, unitLabel,
       bookingSeats, bookingUnitLabel, startDate, endDate,
       contactNumber, originalBaseAmount, baseAmount,
-      perUnitPrice, serviceFee, gstAmount, gstOnServiceFee,
-      totalBeforeDiscount, discount, amount, couponApplied
+      perUnitPrice, serviceFee, gstAmount, totalBeforeDiscount,
+      discount, amount, couponApplied
     } = req.body;
 
     // 3. Validation
@@ -195,7 +202,7 @@ exports.createRazorpayOrder = async (req, res) => {
     // 5. Construct Booking Data
     const bookingData = {
       facilityId: facility._id,
-      startupId: user.id, 
+      startupId: userId,
       incubatorId: facility.serviceProviderId,
       rentalPlan,
       unitCount: unitCount || 1,
@@ -225,7 +232,7 @@ exports.createRazorpayOrder = async (req, res) => {
     let finalBookingDoc;
 
     const existingBooking = await Booking.findOne({
-      startupId: user._id,
+      startupId: userId,
       facilityId: facility._id,
       paymentStatus: 'pending',
       amount: amount,
@@ -238,12 +245,17 @@ exports.createRazorpayOrder = async (req, res) => {
       Object.assign(existingBooking, bookingData);
       existingBooking.updatedAt = new Date();
       finalBookingDoc = await existingBooking.save();
-      bookingId = finalBookingDoc._id.toString();
     } else {
       // Create new
       finalBookingDoc = await Booking.create(bookingData);
-      bookingId = finalBookingDoc._id.toString();
     }
+
+    // ✅ FIX 2: Ensure doc exists before accessing _id
+    if (!finalBookingDoc || !finalBookingDoc._id) {
+      throw new Error("Failed to save booking to database");
+    }
+    
+    bookingId = finalBookingDoc._id.toString();
 
     // 7. Generate Razorpay Order
     const amountInPaise = Math.round(amount * 100); 
@@ -255,7 +267,7 @@ exports.createRazorpayOrder = async (req, res) => {
       notes: {
         bookingId: bookingId,
         facilityId: facilityId,
-        startupId: user._id.toString(),
+        startupId: userId.toString(),
         source: 'express-payment-controller',
         rentalPlan: rentalPlan
       },
@@ -355,10 +367,19 @@ exports.createRetryRazorpayOrder = async (req, res) => {
  */
 exports.verifyPaymentSignatureFacilityBooking = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
 
-    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !bookingId) {
       return res.status(400).json({ isValid: false, message: 'Missing signature data' });
+    }
+
+    const booking = await Booking.findOne({ 
+      _id: bookingId, 
+      razorpayOrderId: razorpay_order_id 
+    });
+
+    if (!booking) {
+      return res.status(404).json({ isValid: false, message: 'Booking not found or order ID mismatch' });
     }
 
     const isValid = await verifyPaymentSignature({
@@ -368,12 +389,60 @@ exports.verifyPaymentSignatureFacilityBooking = async (req, res) => {
     });
 
     if (!isValid) {
+      console.error(`Signature verification failed for booking ${bookingId}`);
+      
+      await Booking.findByIdAndUpdate(bookingId, {
+        paymentStatus: 'failed',
+        paymentDetails: {
+          razorpay_payment_id,
+          razorpay_order_id,
+          razorpay_signature,
+          verificationError: 'Signature verification failed',
+          errorTimestamp: new Date()
+        },
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Allow retry for 24 hours
+        updatedAt: new Date()
+      });
+
       return res.status(400).json({ isValid: false, message: 'Invalid signature' });
     }
 
-    return res.status(200).json({ isValid: true, message: 'Signature verified' });
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        $set: {
+          paymentStatus: 'completed',
+          status: 'pending', // Auto-approve logic
+          expiresAt: null,    // Remove expiration
+          paymentDetails: {
+            razorpay_payment_id,
+            razorpay_order_id,
+            razorpay_signature,
+            verifiedAt: new Date(),
+            status: 'captured'
+          },
+          updatedAt: new Date()
+        }
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({ isValid: true, success: true, message: 'Signature verified' });
+  // runPostBookingTasks(updatedBooking).catch(err => 
+  //     console.error(`Background task error for booking ${bookingId}:`, err)
+  //   );
+
   } catch (error) {
-    console.error('❌ Error verifying payment signature:', error);
+    console.error('❌ Error verifying payment:', error);
+    
+    // Attempt to record the error in the booking if possible
+    if (req.body.bookingId) {
+      await Booking.findByIdAndUpdate(req.body.bookingId, {
+        paymentStatus: 'verification_failed',
+        'paymentDetails.verificationError': error.message
+      }).catch(() => {});
+    }
+
     return res.status(500).json({ isValid: false, message: 'Verification failed', error: error.message });
   }
 };

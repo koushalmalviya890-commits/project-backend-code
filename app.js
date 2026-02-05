@@ -34,8 +34,8 @@ const pricingRoutes = require("./src/routes/pricingRoutes");
 const sectorRoutes = require("./src/routes/SectorRoutes");
 const bookingRoutes = require("./src/routes/BookingRoutes");
 //const mapRoutes = require("./src/routes/mapRoutes");
-//const uploadRoutes = require("./src/routes/uploadRoutes");
-// const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
+const uploadRoutes = require("./src/routes/uploadRoutes");
+const extentBookingRoutes = require("./src/routes/extentBookingRoutes");
 // const chatRoutes = require("./src/routes/chatRoutes");
 // const checkUserRoutes = require("./src/routes/checkUserRoutes");
 // const customersRoutes = require("./src/routes/customersRoutes");
@@ -43,7 +43,6 @@ const bookingRoutes = require("./src/routes/BookingRoutes");
 // const facilityRoutes = require("./src/routes/facilityRoutes");
 // const reviewsRoutes = require("./src/routes/reviewsRoutes");
 // const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
-const bodyParser = require("body-parser");
 const CronJobService = require("./services/cronJobService");
 
 

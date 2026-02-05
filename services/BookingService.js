@@ -225,13 +225,12 @@ const Booking = require("../src/models/Booking");
 const Facility = require("../src/models/Facility");
 const Startup = require("../src/models/Startup");
 const ServiceProvider = require("../src/models/ServiceProvider");
+const Notification = require("../src/models/Notification"); // Ensure you import the model
 
 const { sendSignedWebhook, logWebhookDelivery } = require("./webhookService");
 
 async function createBooking(data, user) {
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
 
@@ -268,7 +267,7 @@ async function createBooking(data, user) {
     // Facility Lookup
     // -------------------
 
-    const facility = await Facility.findById(facilityId).session(session);
+    const facility = await Facility.findById(facilityId)
 
     if (!facility) {
       throw new Error("Facility not found");
@@ -285,7 +284,7 @@ async function createBooking(data, user) {
           { _id: facility.serviceProviderId },
           { userId: facility.serviceProviderId }
         ]
-      }).session(session);
+      });
 
       if (provider?.coupons?.length) {
 
@@ -295,7 +294,7 @@ async function createBooking(data, user) {
 
         if (index !== -1) {
           provider.coupons[index].usedCount += 1;
-          await provider.save({ session });
+          await provider.save();
         }
       }
     }
@@ -304,7 +303,7 @@ async function createBooking(data, user) {
     // Create Booking
     // -------------------
 
-    const booking = await Booking.create([{
+    const booking = await Booking.create({
 
       startupId: user.id,
       facilityId,
@@ -338,21 +337,16 @@ async function createBooking(data, user) {
 
       requestedAt: new Date()
 
-    }], { session });
-
-    await session.commitTransaction();
-    session.endSession();
+    });
 
     return {
       success: true,
-      bookingId: booking[0]._id,
-      data: booking[0]
+      bookingId: booking._id,
+      data: booking
     };
 
   } catch (error) {
-
-    await session.abortTransaction();
-    session.endSession();
+    console.error("Create booking error:", error);
 
     return {
       success: false,
@@ -648,21 +642,16 @@ async function getFailedBooking(facilityId, user) {
 
 
 async function updateBookingStatus(bookingId, newStatus, previousStatus) {
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
 
     // -------------------------
     // Fetch Booking
     // -------------------------
 
-    const booking = await Booking.findById(bookingId).session(session);
+    const booking = await Booking.findById(bookingId)
 
     if (!booking) {
-      await session.abortTransaction();
-      session.endSession();
+   
 
       return {
         success: false,
@@ -678,7 +667,7 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
     booking.updatedAt = new Date();
     booking.processedAt = new Date();
 
-    await booking.save({ session });
+    await booking.save();
 
     // -------------------------
     // Webhook Trigger Condition
@@ -771,9 +760,6 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
     // Commit Transaction
     // -------------------------
 
-    await session.commitTransaction();
-    session.endSession();
-
     return {
       success: true,
       webhookSent,
@@ -781,9 +767,6 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
     };
 
   } catch (error) {
-
-    await session.abortTransaction();
-    session.endSession();
 
     console.error("Update booking status error:", error);
 
@@ -826,9 +809,7 @@ async function createBookingApprovalNotification(bookingId, bookingDetails) {
     }
   };
 
-  const Notification = mongoose.connection.collection("notifications");
-
-  await Notification.insertOne(notification);
+await mongoose.connection.collection("notifications").insertOne(notification);
 }
 
 async function fetchBookingDetailsForWebhook(bookingId) {

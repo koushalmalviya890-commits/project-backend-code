@@ -177,6 +177,9 @@ exports.validateCoupon = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(facilityId)) {
+       return res.status(400).json({ success: false, message: 'Invalid Facility ID' });
+    }
     // 1. Get Facility
     const facility = await Facility.findById(facilityId);
     if (!facility) {
