@@ -27,7 +27,7 @@ const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const cookieParser = require("cookie-parser");
 const multer = require("multer");
-
+const pricingRoutes = require("./src/routes/pricingRoutes");
 
 
 
@@ -163,6 +163,8 @@ app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 // app.use("/api/startup", startupRoutes);
 app.use("/api/extent-bookings", extentBookingRoutes);
+
+
 
 
 // ---------------------------
