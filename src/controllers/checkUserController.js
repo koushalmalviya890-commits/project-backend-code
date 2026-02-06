@@ -2,15 +2,20 @@ const { checkUser } = require("../../services/checkUserService");
 
 async function checkUserController(req, res) {
   try {
-    const { userId, email } = req.body;
+    const userId = req.user?.id || req.body.userId;
+    const email = req.user?.email || req.body.email;
+
+    const { incubatorId } = req.body;
 
     if (!userId && !email) {
       return res.status(400).json({
-        error: "userId or email is required",
+        error:
+          "User ID could not be determined. Ensure Authorization token is sent.",
       });
     }
 
     const result = await checkUser(userId, email);
+
     res.json(result);
   } catch (error) {
     console.error("checkuser error:", error);

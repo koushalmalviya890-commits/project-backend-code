@@ -13,7 +13,7 @@ const Startup = require('../models/Startup.js');
 // import AffiliateLinkUser from '../models/AffiliateLinkUser.js';  
 const AffiliateLinkUser = require('../models/AffiliateLinkUsers.js');
 const {sendServiceProviderAgreementEmail} = require('../../lib/emailService.js');
-
+const Facility = require("../models/Facility.js");
 const generateAuthProviderId = (length = 24) => {
   return crypto.randomBytes(length)
     .toString("base64")
@@ -346,5 +346,88 @@ exports.registerServiceProvider = async (req, res) => {
     }
 
     return res.status(500).json({ error: error.message || "Internal server error" });
+  }
+};
+
+
+exports.calculateAffiliatePrice = async (req, res) => {
+  try {
+    const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
+
+    // 1. Validation
+    if (!facilityId) {
+      return res.status(400).json({ error: "Missing facilityId" });
+    }
+
+    // 2. Fetch Facility
+    const facility = await Facility.findById(facilityId);
+    if (!facility) {
+      return res.status(404).json({ error: "Facility not found" });
+    }
+
+    // 3. Determine Base Price
+    // If frontend sends basePrice, use it. Otherwise calculate from plan.
+    let basePrice = inputBasePrice;
+    
+    if (!basePrice && rentalPlan && unitCount) {
+       const plan = facility.details?.rentalPlans?.find(
+        (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+      );
+      if (plan) {
+        basePrice = plan.price * unitCount * (bookingSeats || 1);
+      }
+    }
+
+    if (!basePrice) {
+       return res.status(400).json({ error: "Could not determine base price" });
+    }
+
+    // 4. Fetch Service Provider
+    const serviceProvider = await ServiceProvider.findOne({
+      userId: facility.serviceProviderId,
+    });
+    
+    if (!serviceProvider) {
+      return res.status(404).json({ error: "Service Provider not found" });
+    }
+
+    // 5. Affiliate Pricing Logic
+    // Logic: Always New User, Rate = 0.07, GST on Total
+    const hasGST = !!serviceProvider.gstNumber;
+    const rate = 0.07;
+    
+    // Fee Calculation
+    const fixedFee = basePrice * rate;
+    const totalBeforeGST = basePrice + fixedFee;
+    
+    let gst = 0;
+    let finalPrice = 0;
+
+    if (hasGST) {
+      // GST is 18% of the Total (Base + Fee)
+      gst = totalBeforeGST * 0.18;
+      finalPrice = totalBeforeGST + gst;
+    } else {
+      gst = 0;
+      finalPrice = totalBeforeGST;
+    }
+
+    // 6. Return Response
+    res.json({
+      success: true,
+      data: {
+        basePrice,
+        fixedFee,
+        hasGST,
+        isExistingUser: false, // Affiliate users are always treated as new
+        gst: Math.round(gst),
+        finalPrice: Math.round(finalPrice),
+        distanceInKm: 0 // Not used for affiliates
+      }
+    });
+
+  } catch (error) {
+    console.error("Affiliate Pricing Error:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
