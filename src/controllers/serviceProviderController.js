@@ -1,6 +1,7 @@
 const ServiceProvider = require("../models/ServiceProvider");
 const mongoose = require("mongoose");
 const Booking = require('../models/Booking');
+const Facility = require('../models/Facility');
 
 // --- GET PROFILE ---
 exports.getServiceProviderProfile = async (req, res) => {
@@ -103,41 +104,42 @@ exports.updateServiceProviderProfile = async (req, res) => {
 
 exports.getEarnings = async (req, res) => {
   try {
-    // 1. Get User ID from Middleware (req.user)
-    // Note: Your Next.js code used `incubatorId: userId`. 
-    // Ensure your Auth Middleware sets req.user._id correctly.
-    const userId = new mongoose.Types.ObjectId(req.user.id); 
+   // 1. Get User ID
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
-    // 2. Run Aggregation Pipeline (Exact Logic Preserved)
-    // Note: Check your actual collection names in MongoDB Compass. 
-    // Mongoose usually pluralizes models (Facility -> facilities). 
-    // If your collections are strictly 'Facilities' and 'Startups' (capitalized), keep as is.
-    // If they are lowercase, change 'from' to 'facilities' and 'startups'.
-    const bookings = await Booking.aggregate([
+    const userIdObj = new mongoose.Types.ObjectId(req.user.id);
+    const userIdStr = req.user.id.toString();
+   const bookings = await Booking.aggregate([
       {
         $match: {
-          incubatorId: userId
+          // Robustness: Match either String or ObjectId to be safe
+          $or: [
+            { incubatorId: userIdObj },
+            { incubatorId: userIdStr }
+          ]
         }
       },
-      // Join with Facilities
+      // ✅ FIX 1: Use 'Facilities' (Capitalized) to match your DB
       {
         $lookup: {
-          from: 'facilities', // ⚠️ CHECK DB: Might be 'Facilities' or 'facilities'
+          from: 'Facilities', 
           localField: 'facilityId',
           foreignField: '_id',
           as: 'facility'
         }
       },
-      // Join with Startups
+      // ✅ FIX 2: Use 'Startups' (Capitalized) to match your DB
       {
         $lookup: {
-          from: 'startups', // ⚠️ CHECK DB: Might be 'Startups' or 'startups'
+          from: 'Startups', 
           localField: 'startupId',
           foreignField: 'userId',
           as: 'startup'
         }
       },
-      // Only keep valid bookings
+      // Only keep valid bookings (non-empty joins)
       {
         $match: {
           'facility': { $ne: [] },
@@ -160,7 +162,7 @@ exports.getEarnings = async (req, res) => {
         $project: {
           _id: 1,
           bookingId: { $toString: "$_id" },
-          date: '$startDate',
+          date: '$startDate', // Next.js mapped 'date' to 'startDate'
           amount: 1,
           serviceFee: 1,
           baseAmount: 1,
@@ -173,7 +175,6 @@ exports.getEarnings = async (req, res) => {
         }
       }
     ]);
-
     // 3. Perform Calculations (Exact Logic Preserved)
     
     // Calculate total earnings (all time)
