@@ -14,6 +14,7 @@ const Startup = require('../models/Startup.js');
 const AffiliateLinkUser = require('../models/AffiliateLinkUsers.js');
 const {sendServiceProviderAgreementEmail} = require('../../lib/emailService.js');
 const Facility = require("../models/Facility.js");
+const Razorpay = require("razorpay");
 const generateAuthProviderId = (length = 24) => {
   return crypto.randomBytes(length)
     .toString("base64")
@@ -350,84 +351,613 @@ exports.registerServiceProvider = async (req, res) => {
 };
 
 
-exports.calculateAffiliatePrice = async (req, res) => {
-  try {
-    const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
+// exports.calculateAffiliatePrice = async (req, res) => {
+//   try {
+//     const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
 
-    // 1. Validation
-    if (!facilityId) {
-      return res.status(400).json({ error: "Missing facilityId" });
+//     // 1. Validation
+//     if (!facilityId) {
+//       return res.status(400).json({ error: "Missing facilityId" });
+//     }
+
+//     // 2. Fetch Facility
+//     const facility = await Facility.findById(facilityId);
+//     if (!facility) {
+//       return res.status(404).json({ error: "Facility not found" });
+//     }
+
+//     // 3. Determine Base Price
+//     // If frontend sends basePrice, use it. Otherwise calculate from plan.
+//     let basePrice = inputBasePrice;
+    
+//     if (!basePrice && rentalPlan && unitCount) {
+//        const plan = facility.details?.rentalPlans?.find(
+//         (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+//       );
+//       if (plan) {
+//         basePrice = plan.price * unitCount * (bookingSeats || 1);
+//       }
+//     }
+
+//     if (!basePrice) {
+//        return res.status(400).json({ error: "Could not determine base price" });
+//     }
+
+//     // 4. Fetch Service Provider
+//     const serviceProvider = await ServiceProvider.findOne({
+//       userId: facility.serviceProviderId,
+//     });
+    
+//     if (!serviceProvider) {
+//       return res.status(404).json({ error: "Service Provider not found" });
+//     }
+
+//     // 5. Affiliate Pricing Logic
+//     // Logic: Always New User, Rate = 0.07, GST on Total
+//     const hasGST = !!serviceProvider.gstNumber;
+//     const rate = 0.07;
+    
+//     // Fee Calculation
+//     const fixedFee = basePrice * rate;
+//     const totalBeforeGST = basePrice + fixedFee;
+    
+//     let gst = 0;
+//     let finalPrice = 0;
+
+//     if (hasGST) {
+//       // GST is 18% of the Total (Base + Fee)
+//       gst = totalBeforeGST * 0.18;
+//       finalPrice = totalBeforeGST + gst;
+//     } else {
+//       gst = 0;
+//       finalPrice = totalBeforeGST;
+//     }
+
+//     // 6. Return Response
+//     res.json({
+//       success: true,
+//       data: {
+//         basePrice,
+//         fixedFee,
+//         hasGST,
+//         isExistingUser: false, // Affiliate users are always treated as new
+//         gst: Math.round(gst),
+//         finalPrice: Math.round(finalPrice),
+//         distanceInKm: 0 // Not used for affiliates
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("Affiliate Pricing Error:", error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
+
+//user
+exports.createAffiliateUser = async (req, res) => {
+  try {
+    const { mailId, contactNumber, contactName, affiliateId } = req.body;
+
+    if (mailId && !/^\S+@\S+\.\S+$/.test(mailId)) {
+      return res.status(400).json({ error: "Invalid email format" });
     }
 
-    // 2. Fetch Facility
+    const exists = await AffiliateLinkUser.findOne({ mailId });
+    if (exists) {
+      return res.status(409).json({ error: "User already exists" });
+    }
+
+    const user = await AffiliateLinkUser.create({
+      mailId,
+      contactNumber,
+      contactName,
+      affiliateId,
+      createdAt: new Date(),
+    });
+
+    return res.status(201).json({
+      message: "Affiliate user created",
+      user
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+//user/visitor
+exports.trackAffiliateVisitor = async (req, res) => {
+  try {
+    const { affiliateId } = req.body;
+
+    const affiliate = await mongoose.connection
+      .collection("affiliatepartners")
+      .findOne({ _id: new mongoose.Types.ObjectId(affiliateId) });
+
+    if (!affiliate) {
+      await mongoose.connection.collection("affiliatepartners").insertOne({
+        _id: new mongoose.Types.ObjectId(affiliateId),
+        visitors: 1,
+        createdAt: new Date()
+      });
+    } else {
+      await mongoose.connection.collection("affiliatepartners").updateOne(
+        { _id: new mongoose.Types.ObjectId(affiliateId) },
+        { $inc: { visitors: 1 } }
+      );
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+//user/customers
+exports.trackAffiliateCustomer = async (req, res) => {
+  try {
+    const { startupMailId } = req.body;
+
+    const affiliateUser = await AffiliateLinkUser.findOne({
+      mailId: startupMailId
+    });
+
+    if (!affiliateUser?.affiliateId) {
+      return res.status(404).json({ error: "Affiliate not found" });
+    }
+
+    await mongoose.connection.collection("affiliatepartners").updateOne(
+      { _id: new mongoose.Types.ObjectId(affiliateUser.affiliateId) },
+      { $inc: { customers: 1 } }
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+//pricing
+exports.calculateAffiliatePrice = async (req, res) => {
+  try {
+    const { facilityId, basePrice } = req.body;
+
+    // 1️ Validation
+    if (!facilityId || !basePrice) {
+      return res.status(400).json({
+        error: "facilityId and basePrice are required",
+      });
+    }
+
+    // 2️ Fetch Facility
     const facility = await Facility.findById(facilityId);
     if (!facility) {
       return res.status(404).json({ error: "Facility not found" });
     }
 
-    // 3. Determine Base Price
-    // If frontend sends basePrice, use it. Otherwise calculate from plan.
-    let basePrice = inputBasePrice;
-    
-    if (!basePrice && rentalPlan && unitCount) {
-       const plan = facility.details?.rentalPlans?.find(
-        (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
-      );
-      if (plan) {
-        basePrice = plan.price * unitCount * (bookingSeats || 1);
-      }
-    }
-
-    if (!basePrice) {
-       return res.status(400).json({ error: "Could not determine base price" });
-    }
-
-    // 4. Fetch Service Provider
+    // 3️ Fetch Service Provider
     const serviceProvider = await ServiceProvider.findOne({
       userId: facility.serviceProviderId,
     });
-    
+
     if (!serviceProvider) {
       return res.status(404).json({ error: "Service Provider not found" });
     }
 
-    // 5. Affiliate Pricing Logic
-    // Logic: Always New User, Rate = 0.07, GST on Total
+    // 4️ Check GST
     const hasGST = !!serviceProvider.gstNumber;
+
+    // 5️ Apply Affiliate Pricing Logic 
     const rate = 0.07;
-    
-    // Fee Calculation
     const fixedFee = basePrice * rate;
+
     const totalBeforeGST = basePrice + fixedFee;
-    
+
     let gst = 0;
-    let finalPrice = 0;
+    let finalPrice = totalBeforeGST;
 
     if (hasGST) {
-      // GST is 18% of the Total (Base + Fee)
       gst = totalBeforeGST * 0.18;
-      finalPrice = totalBeforeGST + gst;
+      finalPrice = totalBeforeGST; //  
     } else {
-      gst = 0;
       finalPrice = totalBeforeGST;
     }
 
-    // 6. Return Response
-    res.json({
+    // 6️ Response (Exact Structure)
+    return res.status(200).json({
       success: true,
       data: {
         basePrice,
         fixedFee,
         hasGST,
-        isExistingUser: false, // Affiliate users are always treated as new
-        gst: Math.round(gst),
+        isExistingUser: false,
+        gst: hasGST ? Math.round(gst) : 0,
         finalPrice: Math.round(finalPrice),
-        distanceInKm: 0 // Not used for affiliates
-      }
+        distanceInKm: 0,
+      },
     });
 
   } catch (error) {
     console.error("Affiliate Pricing Error:", error);
-    res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+//pricing-detail-page
+exports.calculateAffiliatePriceDetail = async (req, res) => {
+  try {
+    const { facilityId, rentalPlan, unitCount, bookingSeats } = req.body;
+
+    // 1️ Validation (same as Next.js route)
+    if (!facilityId || !rentalPlan || !unitCount) {
+      return res.status(400).json({
+        error: "facilityId, rentalPlan and unitCount are required",
+      });
+    }
+
+    // 2️ Fetch Facility
+    const facility = await Facility.findById(facilityId);
+    if (!facility) {
+      return res.status(404).json({ error: "Facility not found" });
+    }
+
+    // 3️ Find Rental Plan (case-insensitive match)
+    const plan = facility.details?.rentalPlans?.find(
+      (p) =>
+        p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+    );
+
+    if (!plan) {
+      return res.status(404).json({ error: "Rental plan not found" });
+    }
+
+    // 4️ Calculate Base Price
+    const basePrice = plan.price * unitCount * bookingSeats;
+
+    // 5️ Fetch Service Provider
+    const serviceProvider = await ServiceProvider.findOne({
+      userId: facility.serviceProviderId,
+    });
+
+    if (!serviceProvider) {
+      return res.status(404).json({ error: "Service Provider not found" });
+    }
+
+    // 6️ GST Check
+    const hasGST = !!serviceProvider.gstNumber;
+
+    // 7️ Pricing Logic 
+    const rate = 0.07;
+    const fixedFee = basePrice * rate;
+
+    const totalBeforeGST = basePrice + fixedFee;
+
+    let gstAmount = 0;
+    let finalPrice = totalBeforeGST;
+
+    if (hasGST) {
+      gstAmount = totalBeforeGST * 0.18;
+      finalPrice = totalBeforeGST + gstAmount; // GST ADDED 
+    } else {
+      finalPrice = totalBeforeGST;
+    }
+
+    // 8️ Response 
+    return res.status(200).json({
+      success: true,
+      data: {
+        basePrice,
+        fixedFee,
+        gstAmount,
+        finalPrice: Math.round(finalPrice),
+        isExistingUser: false,
+        hasGST,
+        distanceInKm: 0,
+        bookingSeats,
+      },
+    });
+
+  } catch (error) {
+    console.error("Affiliate Pricing Detail Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+
+//payments/razorpay
+//Order
+exports.createAffiliateOrder = async (req, res) => {
+  try {
+    const {
+      email,
+      facilityId,
+      rentalPlan,
+      amount,
+      originalBaseAmount,
+      serviceFee,
+      gstAmount,
+      totalAmount,
+      startDate,
+      endDate,
+      contactNumber,
+      unitCount,
+      bookingSeats,
+    } = req.body;
+
+    // 1️ Validate environment keys
+    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({
+        error: "Payment service not configured",
+      });
+    }
+
+    // 2️ Validate required fields (same as Next.js)
+    if (
+      !email ||
+      !facilityId ||
+      !rentalPlan ||
+      typeof amount !== "number" ||
+      typeof totalAmount !== "number" ||
+      !startDate ||
+      !endDate ||
+      !contactNumber
+    ) {
+      return res.status(400).json({
+        error: "Missing required fields for booking",
+      });
+    }
+
+    // 3️ Initialize Razorpay
+    const razorpayClient = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
+
+    // 4️ Ensure user exists
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        email,
+        userType: "startup",
+      });
+    }
+
+    const startupId = user._id;
+
+    // 5️ Fetch Facility
+    const facility = await Facility.findById(facilityId);
+    if (!facility) {
+      return res.status(404).json({ error: "Facility not found" });
+    }
+
+    // 6️ Create pending booking (MATCHING Next.js structure)
+    const bookingData = {
+      facilityId: new mongoose.Types.ObjectId(facilityId),
+      startupId: new mongoose.Types.ObjectId(startupId),
+      incubatorId: facility.serviceProviderId,
+      affiliateUserEmail: email || null, // IMPORTANT for affiliate tracking
+      rentalPlan,
+      status: "pending",
+      paymentStatus: "pending",
+      amount: totalAmount,
+      baseAmount: originalBaseAmount,
+      originalBaseAmount: originalBaseAmount || undefined,
+      serviceFee: serviceFee || undefined,
+      gstAmount: gstAmount,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      whatsappNumber: contactNumber,
+      unitCount: unitCount || 1,
+      requestedAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      paymentRetries: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      bookingSeats: bookingSeats || 1,
+    };
+
+    const booking = await mongoose.connection
+      .collection("bookings")
+      .insertOne(bookingData);
+
+    const bookingId = booking.insertedId;
+
+    try {
+      // 7️ Create Razorpay order
+      const razorpayOrder = await razorpayClient.orders.create({
+        amount: Math.round(totalAmount * 100),
+        currency: "INR",
+        receipt: bookingId.toString(),
+        notes: {
+          bookingId: bookingId.toString(),
+          facilityId,
+          startupId: startupId.toString(),
+          rentalPlan,
+        },
+      });
+
+      // 8️ Update booking with Razorpay order ID
+      await mongoose.connection.collection("bookings").updateOne(
+        { _id: bookingId },
+        {
+          $set: {
+            razorpayOrderId: razorpayOrder.id,
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      // 9️ Return response
+      return res.status(200).json({
+        orderId: razorpayOrder.id,
+        bookingId: bookingId.toString(),
+        amount: totalAmount,
+        currency: "INR",
+        keyId: RAZORPAY_KEY_ID,
+      });
+
+    } catch (razorpayError) {
+      // Cleanup if order creation fails
+      await mongoose.connection
+        .collection("bookings")
+        .deleteOne({ _id: bookingId });
+
+      return res.status(500).json({
+        error: "Failed to create payment order",
+        details: razorpayError.message,
+      });
+    }
+
+  } catch (error) {
+    console.error("Affiliate Order Creation Error:", error);
+    return res.status(500).json({
+      error: "Failed to create booking",
+      details: error.message,
+    });
+  }
+};
+
+
+//retry-payment
+exports.retryAffiliatePayment = async (req, res) => {
+  try {
+    const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({
+        error: "Payment service not configured",
+      });
+    }
+
+    const razorpayClient = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
+
+    //  Authentication (Express version of getServerSession)
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (req.user.userType !== "startup") {
+      return res.status(403).json({
+        error: "Only startups can retry bookings",
+      });
+    }
+
+    const { bookingId, token } = req.body;
+
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({
+        error: "Invalid booking ID",
+      });
+    }
+
+    const booking = await mongoose.connection
+      .collection("bookings")
+      .findOne({
+        _id: new mongoose.Types.ObjectId(bookingId),
+        startupId: new mongoose.Types.ObjectId(req.user.id),
+      });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found or unauthorized",
+      });
+    }
+
+    //  Token validation (if provided)
+    if (token && booking.retryToken !== token) {
+      return res.status(401).json({
+        error: "Invalid retry token",
+      });
+    }
+
+    // Must be failed
+    if (booking.paymentStatus !== "failed") {
+      return res.status(400).json({
+        error: "This booking is not in a retry-able state",
+      });
+    }
+
+    // Expiry check
+    if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
+      return res.status(410).json({
+        error: "The retry window for this booking has expired",
+      });
+    }
+
+    try {
+      // Create Razorpay order again
+      const razorpayOrder = await razorpayClient.orders.create({
+        amount: Math.round(booking.amount * 100),
+        currency: "INR",
+        receipt: booking._id.toString(),
+        notes: {
+          bookingId: booking._id.toString(),
+          facilityId: booking.facilityId.toString(),
+          startupId: req.user.id,
+          rentalPlan: booking.rentalPlan,
+          isRetry: "true",
+        },
+      });
+
+      const retryAttempt = {
+        razorpayOrderId: razorpayOrder.id,
+        attemptedAt: new Date(),
+        status: "pending",
+      };
+
+      await mongoose.connection.collection("bookings").updateOne(
+        { _id: new mongoose.Types.ObjectId(bookingId) },
+        {
+          $set: {
+            razorpayOrderId: razorpayOrder.id,
+            updatedAt: new Date(),
+          },
+          $unset: {
+            retryToken: "",
+          },
+          $push: {
+            paymentRetries: retryAttempt,
+          },
+        }
+      );
+
+      return res.status(200).json({
+        orderId: razorpayOrder.id,
+        bookingId: bookingId,
+        amount: booking.amount,
+        currency: "INR",
+        keyId: RAZORPAY_KEY_ID,
+      });
+
+    } catch (razorpayError) {
+      return res.status(500).json({
+        error: "Failed to create retry payment order",
+        details: razorpayError.message,
+      });
+    }
+
+  } catch (error) {
+    console.error("Retry Payment Error:", error);
+    return res.status(500).json({
+      error: "Failed to create retry payment order",
+    });
   }
 };
