@@ -12,15 +12,23 @@ const ServiceProvider = require('../models/ServiceProvider.js');
 const Startup = require('../models/Startup.js');
 // import AffiliateLinkUser from '../models/AffiliateLinkUser.js';  
 const AffiliateLinkUser = require('../models/AffiliateLinkUsers.js');
-const {sendServiceProviderAgreementEmail} = require('../../lib/emailService.js');
+
 const Facility = require("../models/Facility.js");
 const Razorpay = require("razorpay");
+
+const { generateAndStoreInvoice } = require("../../lib/emailAffiliate.js");
+const { addCustomerViaAffiliateLink } = require("../../lib/addCustomerViaAffiliateLink.js");
+const { sendServiceProviderNotificationEmail, sendFacilityContactMail } = require("../../lib/email.js");
+const { logToDB } = require("../../lib/logToDb.js");
+
 const generateAuthProviderId = (length = 24) => {
   return crypto.randomBytes(length)
     .toString("base64")
     .replace(/[^a-zA-Z0-9]/g, "")
     .slice(0, length);
 };
+
+
 
 // 1. CHECK AFFILIATE EMAIL (and create placeholder if valid)
 exports.checkAffiliateEmail = async (req, res) => {
@@ -833,8 +841,140 @@ exports.createAffiliateOrder = async (req, res) => {
 
 
 //retry-payment
+// exports.retryAffiliatePayment = async (req, res) => {
+//   try {
+//     const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+//     const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+//     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+//       return res.status(500).json({
+//         error: "Payment service not configured",
+//       });
+//     }
+
+//     const razorpayClient = new Razorpay({
+//       key_id: RAZORPAY_KEY_ID,
+//       key_secret: RAZORPAY_KEY_SECRET,
+//     });
+
+//     //  Authentication (Express version of getServerSession)
+//     if (!req.user || !req.user.id) {
+//       return res.status(401).json({ error: "Unauthorized" });
+//     }
+
+//     if (req.user.userType !== "startup") {
+//       return res.status(403).json({
+//         error: "Only startups can retry bookings",
+//       });
+//     }
+
+//     const { bookingId, token } = req.body;
+
+//     if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+//       return res.status(400).json({
+//         error: "Invalid booking ID",
+//       });
+//     }
+
+//     const booking = await mongoose.connection
+//       .collection("bookings")
+//       .findOne({
+//         _id: new mongoose.Types.ObjectId(bookingId),
+//         startupId: new mongoose.Types.ObjectId(req.user.id),
+//       });
+
+//     if (!booking) {
+//       return res.status(404).json({
+//         error: "Booking not found or unauthorized",
+//       });
+//     }
+
+//     //  Token validation (if provided)
+//     if (token && booking.retryToken !== token) {
+//       return res.status(401).json({
+//         error: "Invalid retry token",
+//       });
+//     }
+
+//     // Must be failed
+//     if (booking.paymentStatus !== "failed") {
+//       return res.status(400).json({
+//         error: "This booking is not in a retry-able state",
+//       });
+//     }
+
+//     // Expiry check
+//     if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
+//       return res.status(410).json({
+//         error: "The retry window for this booking has expired",
+//       });
+//     }
+
+//     try {
+//       // Create Razorpay order again
+//       const razorpayOrder = await razorpayClient.orders.create({
+//         amount: Math.round(booking.amount * 100),
+//         currency: "INR",
+//         receipt: booking._id.toString(),
+//         notes: {
+//           bookingId: booking._id.toString(),
+//           facilityId: booking.facilityId.toString(),
+//           startupId: req.user.id,
+//           rentalPlan: booking.rentalPlan,
+//           isRetry: "true",
+//         },
+//       });
+
+//       const retryAttempt = {
+//         razorpayOrderId: razorpayOrder.id,
+//         attemptedAt: new Date(),
+//         status: "pending",
+//       };
+
+//       await mongoose.connection.collection("bookings").updateOne(
+//         { _id: new mongoose.Types.ObjectId(bookingId) },
+//         {
+//           $set: {
+//             razorpayOrderId: razorpayOrder.id,
+//             updatedAt: new Date(),
+//           },
+//           $unset: {
+//             retryToken: "",
+//           },
+//           $push: {
+//             paymentRetries: retryAttempt,
+//           },
+//         }
+//       );
+
+//       return res.status(200).json({
+//         orderId: razorpayOrder.id,
+//         bookingId: bookingId,
+//         amount: booking.amount,
+//         currency: "INR",
+//         keyId: RAZORPAY_KEY_ID,
+//       });
+
+//     } catch (razorpayError) {
+//       return res.status(500).json({
+//         error: "Failed to create retry payment order",
+//         details: razorpayError.message,
+//       });
+//     }
+
+//   } catch (error) {
+//     console.error("Retry Payment Error:", error);
+//     return res.status(500).json({
+//       error: "Failed to create retry payment order",
+//     });
+//   }
+// };
+
+//retry-payment
 exports.retryAffiliatePayment = async (req, res) => {
   try {
+    const { bookingId, token } = req.body;
+
     const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
     const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
@@ -844,12 +984,7 @@ exports.retryAffiliatePayment = async (req, res) => {
       });
     }
 
-    const razorpayClient = new Razorpay({
-      key_id: RAZORPAY_KEY_ID,
-      key_secret: RAZORPAY_KEY_SECRET,
-    });
-
-    //  Authentication (Express version of getServerSession)
+    //  Must use protect middleware before this route
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -860,13 +995,16 @@ exports.retryAffiliatePayment = async (req, res) => {
       });
     }
 
-    const { bookingId, token } = req.body;
-
     if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
       return res.status(400).json({
         error: "Invalid booking ID",
       });
     }
+
+    const razorpayClient = new Razorpay({
+      key_id: RAZORPAY_KEY_ID,
+      key_secret: RAZORPAY_KEY_SECRET,
+    });
 
     const booking = await mongoose.connection
       .collection("bookings")
@@ -881,7 +1019,7 @@ exports.retryAffiliatePayment = async (req, res) => {
       });
     }
 
-    //  Token validation (if provided)
+    // Retry token validation (optional)
     if (token && booking.retryToken !== token) {
       return res.status(401).json({
         error: "Invalid retry token",
@@ -903,7 +1041,6 @@ exports.retryAffiliatePayment = async (req, res) => {
     }
 
     try {
-      // Create Razorpay order again
       const razorpayOrder = await razorpayClient.orders.create({
         amount: Math.round(booking.amount * 100),
         currency: "INR",
@@ -941,7 +1078,7 @@ exports.retryAffiliatePayment = async (req, res) => {
 
       return res.status(200).json({
         orderId: razorpayOrder.id,
-        bookingId: bookingId,
+        bookingId,
         amount: booking.amount,
         currency: "INR",
         keyId: RAZORPAY_KEY_ID,
@@ -959,5 +1096,207 @@ exports.retryAffiliatePayment = async (req, res) => {
     return res.status(500).json({
       error: "Failed to create retry payment order",
     });
+  }
+};
+
+//verify-payment
+exports.verifyAffiliatePayment = async (req, res) => {
+  try {
+    const {
+      razorpay_payment_id,
+      razorpay_order_id,
+      razorpay_signature,
+      bookingId
+    } = req.body;
+
+    const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature || !bookingId) {
+      return res.status(400).json({
+        error: "Missing payment verification details"
+      });
+    }
+
+    if (!RAZORPAY_KEY_SECRET) {
+      return res.status(500).json({
+        error: "Payment verification service not configured"
+      });
+    }
+
+    const db = mongoose.connection.db;
+
+    const booking = await db.collection("bookings").findOne({
+      _id: new mongoose.Types.ObjectId(bookingId),
+      razorpayOrderId: razorpay_order_id
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found or order ID mismatch"
+      });
+    }
+
+    //  SIGNATURE VALIDATION
+    const generatedSignature = crypto
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      await db.collection("bookings").updateOne(
+        { _id: new mongoose.Types.ObjectId(bookingId) },
+        {
+          $set: {
+            paymentStatus: "failed",
+            paymentDetails: {
+              razorpay_payment_id,
+              razorpay_order_id,
+              verificationError: "Signature verification failed"
+            },
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return res.status(400).json({
+        error: "Payment verification failed",
+        success: false
+      });
+    }
+
+    //  PAYMENT SUCCESS
+    await db.collection("bookings").updateOne(
+      { _id: new mongoose.Types.ObjectId(bookingId) },
+      {
+        $set: {
+          paymentStatus: "completed",
+          expiresAt: null,
+          paymentDetails: {
+            razorpay_payment_id,
+            razorpay_order_id,
+            razorpay_signature,
+            verifiedAt: new Date()
+          },
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    //  Create notification
+    try {
+      await createBookingNotification(db, booking);
+    } catch (e) {
+      console.error("Notification error:", e);
+    }
+
+    //  Generate invoice
+    try {
+      const invoiceUrl = await generateAndStoreInvoice(bookingId);
+      if (invoiceUrl) {
+        await logToDB(db, "info", `Invoice generated: ${invoiceUrl}`);
+      }
+    } catch (e) {
+      await logToDB(db, "error", "Invoice generation failed", e);
+    }
+
+    // 👥 Add affiliate customer
+    try {
+      await addCustomerViaAffiliateLink(booking);
+    } catch (e) {
+      console.error("Affiliate customer tracking failed:", e);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified successfully"
+    });
+
+  } catch (error) {
+    console.error("Verify Payment Error:", error);
+    return res.status(500).json({
+      error: "Failed to verify payment",
+      success: false
+    });
+  }
+};
+
+
+async function createBookingNotification(db, booking){
+  try {
+    
+   //  Fetch Facility
+    const facility = await db.collection("Facilities").findOne({
+      _id: booking.facilityId
+    });
+
+    // 🚀 Fetch Affiliate Startup (AffiliateLinkUsers)
+    const startup = await db.collection("AffiliateLinkUsers").findOne({
+      mailId: booking.affiliateUserEmail
+    });
+
+    //  Fetch Service Provider (Users collection)
+    const serviceProvider = await db.collection("Users").findOne({
+      _id: booking.incubatorId
+    });
+
+    if (!facility || !startup || !serviceProvider) {
+      console.warn("Notification skipped: Missing required data.");
+      return;
+    }
+
+    //  Create DB Notification
+    const notification = {
+      userId: serviceProvider._id.toString(),
+      type: "booking-approved",
+      title: "New Booking Approved",
+      message: `${startup.contactName} has booked ${facility.details?.name} for ${booking.rentalPlan}.`,
+      relatedId: booking._id.toString(),
+      relatedType: "booking",
+      isRead: false,
+      createdAt: new Date(),
+      metadata: {
+        facilityName: facility.details?.name,
+        startupName: startup.contactName,
+        facilityType: facility.facilityType,
+        startDate: new Date(booking.startDate)
+          .toISOString()
+          .split("T")[0],
+        endDate: new Date(booking.endDate)
+          .toISOString()
+          .split("T")[0],
+        amount: booking.amount
+      }
+    };
+
+    await db.collection("notifications").insertOne(notification);
+
+    //  Send Email to Service Provider
+    await sendServiceProviderNotificationEmail({
+      to: serviceProvider.email,
+      facilityName: facility.details?.name,
+      startupName: startup.contactName,
+      rentalPlan: booking.rentalPlan,
+      startDate: booking.startDate,
+      endDate: booking.endDate,
+      amount: booking.amount
+    });
+
+    //  Send Email to Facility Contact
+    if (facility.email) {
+      await sendFacilityContactMail({
+        to: facility.email,
+        facilityName: facility.details?.name,
+        startupName: startup.contactName,
+        rentalPlan: booking.rentalPlan,
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        amount: booking.amount
+      });
+    }
+
+  } catch (error) {
+    console.error("Error in createBookingNotification:", error);
+    // ❗ Do NOT throw — payment flow must not break
   }
 };

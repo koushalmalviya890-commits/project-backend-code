@@ -11,7 +11,8 @@ const { checkAffiliateEmail,
     trackAffiliateCustomer,
     calculateAffiliatePriceDetail,
     createAffiliateOrder,
-    retryAffiliatePayment } = require('../controllers/affiliateController.js');
+    retryAffiliatePayment,
+    verifyAffiliatePayment } = require('../controllers/affiliateController.js');
 
 
 router.post('/check', checkAffiliateEmail);
@@ -29,6 +30,7 @@ router.post('/user/pricing', calculateAffiliatePrice);
 router.post("/user/pricing-detail-page", calculateAffiliatePriceDetail)
 router.post("/user/payments/order", createAffiliateOrder)
 router.post("user/payments/retry", retryAffiliatePayment)
+router.post("/user/payments/verify", verifyAffiliatePayment)
 
 
 
