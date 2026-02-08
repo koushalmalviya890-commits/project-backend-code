@@ -117,6 +117,12 @@ const facilitySchema = new mongoose.Schema({
     ],
     required: true,
   },
+  privacyType: {
+    type: String,
+    enum: ['public', 'private'],
+    default: 'public',
+    required: true
+  },
   status: {
     type: String,
     enum: ['active', 'pending', 'rejected', 'inactive'],
