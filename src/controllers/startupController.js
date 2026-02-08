@@ -63,4 +63,25 @@ exports.getStartupBookings = async (req, res) => {
 
 }
 
+exports.getStartupByUserId = async (req, res) => {
+  try {
+    // 1. Get userId from query params (matching Next.js behavior)
+    const { userId } = req.query;
 
+    if (!userId) {
+      return res.status(400).json({ error: 'userId parameter is required' });
+    }
+
+    // 2. Use the Service to fetch (It handles the ObjectId vs String logic)
+    const startup = await startupService.getProfile(userId);
+
+    if (!startup) {
+      return res.status(404).json({ error: 'Startup not found' });
+    }
+
+    res.json(startup);
+  } catch (error) {
+    console.error('Error fetching startup by user id:', error);
+    res.status(500).json({ error: 'Failed to fetch startup details' });
+  }
+};

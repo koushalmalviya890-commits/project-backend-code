@@ -120,6 +120,6 @@ UserSchema.methods.isOTPExpired = function () {
 // UserSchema.index({ resetOTPCreatedAt: 1 }, { expireAfterSeconds: 300 })
 
 // ⛔ Prevent OverwriteModelError during hot reloads
-const User = mongoose.models.Users || mongoose.model('Users', UserSchema)
+const User = mongoose.models.User || mongoose.model('User', UserSchema, 'Users');
 
 module.exports = User;
