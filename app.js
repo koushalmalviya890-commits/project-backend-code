@@ -25,7 +25,7 @@ const reviewsRoutes = require("./src/routes/reviewsRoutes");
 const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const newsletterRoutes = require("./src/routes/newsletterRoutes");
-const cookieParser = require("cookie-parser");
+// const cookieParser = require("cookie-parser");
 const multer = require("multer");
 
 const pricingRoutes = require("./src/routes/pricingRoutes");
@@ -163,7 +163,7 @@ app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 // app.use("/api/startup", startupRoutes);
-app.use("/api/extent-bookings", extentBookingRoutes);
+app.use("/api", extentBookingRoutes);
 // app.use("/api", facilityBookingRoutes)
 
 // ---------------------------
