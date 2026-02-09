@@ -52,7 +52,7 @@ exports.updateStartupProfile = async (req, res) => {
 
 exports.getStartupBookings = async (req, res) => {
   const { userId } = req.params;
-
+console.log("Received userId:", userId);
   try {
     const bookings = await startupService.getStartupBookings(userId);
     res.json(bookings);

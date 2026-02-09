@@ -180,4 +180,5 @@ bookingSchema.virtual('serviceProviderId').get(function () {
 // Export Model
 // -------------------------
 
-module.exports = mongoose.model('Booking', bookingSchema);
+module.exports =
+  mongoose.models.Bookings || mongoose.model("Bookings", bookingSchema);

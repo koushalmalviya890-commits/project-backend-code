@@ -166,8 +166,10 @@ app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 // app.use("/api/startup", startupRoutes);
-app.use("/api/extent-bookings", extentBookingRoutes);
+
+//app.use("/api/extent-bookings", extentBookingRoutes);
 app.use('/api/private-facilities', privateFacilityRoutes);
+app.use("/api", extentBookingRoutes);
 // app.use("/api", facilityBookingRoutes)
 
 
