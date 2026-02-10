@@ -14,7 +14,7 @@ async function getProfile(id) {
     $or: [
       { _id: objectId },
       { userId: objectId },
-      { userId: id }, // in case stored as string
+      { userId: id }, 
     ],
   }).lean();
 }
