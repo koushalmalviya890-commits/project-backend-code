@@ -66,12 +66,12 @@ async function getStartupBookings(userId) {
     const providerIds = [...new Set(bookings.map((b) => b.incubatorId))];
 
     // B. Fetch all related Facilities and Service Providers in one go
-    const facilities = await Facility.find({ _id: { $in: facilityIds } })
-      .select("name location type images") // Select fields your frontend needs
+const facilities = await Facility.find({ _id: { $in: facilityIds } })
+      .select("details.name details.images facilityType address city state") 
       .lean();
 
-    const providers = await ServiceProvider.find({ _id: { $in: providerIds } })
-      .select("companyName logoUrl email") // Adjust 'companyName' if your field is different
+const providers = await ServiceProvider.find({ userId: { $in: providerIds } })
+      .select("userId serviceName logoUrl primaryEmailId") 
       .lean();
 
     // C. Create lookup maps for faster access
@@ -80,34 +80,43 @@ async function getStartupBookings(userId) {
       facilityMap[f._id.toString()] = f;
     });
 
-    const providerMap = {};
+ const providerMap = {};
     providers.forEach((p) => {
-      providerMap[p._id.toString()] = p;
+      // ✅ FIX: Safely convert to string to match the lookup key
+      if (p.userId) {
+        providerMap[p.userId.toString()] = p;
+      }
     });
 
     // D. Attach the details to each booking object
-    const enrichedBookings = bookings.map((booking) => {
-      // Find the details using the ID
-      const facility = facilityMap[booking.facilityId.toString()] || {};
-      const provider = providerMap[booking.incubatorId.toString()] || {};
+   const enrichedBookings = bookings.map((booking) => {
+      // Handle missing IDs gracefully
+      const fId = booking.facilityId ? booking.facilityId.toString() : "";
+      const pId = booking.incubatorId ? booking.incubatorId.toString() : "";
+
+      const facility = facilityMap[fId] || {};
+      const provider = providerMap[pId] || {};
+
+      // Helper to safely access nested details
+      const fDetails = facility.details || {};
 
       return {
         ...booking,
-        // Match the structure your Frontend expects
         facilityDetails: {
-          name: facility.name || "Unknown Facility",
-          location: facility.location || {},
-          type: facility.type || "Workspace",
-          images: facility.images || [],
+          name: fDetails.name || "Unknown Facility", // Accessing details.name
+          location: facility.city 
+            ? `${facility.city}, ${facility.state}` 
+            : (facility.address || "Unknown Location"),
+          type: facility.facilityType || "Workspace", // Accessing facilityType
+          images: fDetails.images || [], // Accessing details.images
         },
         serviceProviderDetails: {
-          name: provider.companyName || provider.name || "Unknown Provider",
+          name: provider.serviceName || "Unknown Provider", // Accessing serviceName
           logoUrl: provider.logoUrl || "",
-          email: provider.email || "",
+          email: provider.primaryEmailId || "", // Accessing primaryEmailId
         },
       };
     });
-
     return enrichedBookings;
   } catch (error) {
     console.error("Error in getStartupBookings Service:", error);

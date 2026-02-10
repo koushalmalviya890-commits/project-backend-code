@@ -169,7 +169,7 @@ app.use("/api/newsletter", newsletterRoutes);
 
 //app.use("/api/extent-bookings", extentBookingRoutes);
 app.use('/api/private-facilities', privateFacilityRoutes);
-app.use("/api", extentBookingRoutes);
+app.use("/api/extent-booking", extentBookingRoutes);
 // app.use("/api", facilityBookingRoutes)
 
 
