@@ -233,4 +233,4 @@ startupSchema.pre('save', function (next) {
 // Export the model (prevents OverwriteModelError)
 module.exports =
   mongoose.models.Startups ||
-  mongoose.model('Startups', startupSchema)
+  mongoose.model("Startup", startupSchema, "Startups");

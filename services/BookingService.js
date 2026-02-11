@@ -218,22 +218,19 @@
 //   updateBookingStatus,
 // };
 
-
 const mongoose = require("mongoose");
 
 const Booking = require("../src/models/Booking");
 const Facility = require("../src/models/Facility");
 const Startup = require("../src/models/Startup");
 const ServiceProvider = require("../src/models/ServiceProvider");
+const { generateAndStoreInvoice } = require("./invoiceService");
 const Notification = require("../src/models/Notification"); // Ensure you import the model
 
 const { sendSignedWebhook, logWebhookDelivery } = require("./webhookService");
 
 async function createBooking(data, user) {
-
-
   try {
-
     const {
       facilityId,
       rentalPlan,
@@ -252,22 +249,23 @@ async function createBooking(data, user) {
       totalBeforeDiscount,
       discount,
       amount,
-      couponApplied
+      couponApplied,
     } = data;
 
-    // -------------------
-    // Validation
-    // -------------------
 
-    if (!facilityId || !rentalPlan || !contactNumber || !amount) {
-      throw new Error("Missing required fields");
-    }
+      if (!facilityId || !rentalPlan || !contactNumber || !amount) {
+        // -------------------
+        // Validation
+        // -------------------
+
+        throw new Error("Missing required fields");
+      }
 
     // -------------------
     // Facility Lookup
     // -------------------
 
-    const facility = await Facility.findById(facilityId)
+    const facility = await Facility.findById(facilityId);
 
     if (!facility) {
       throw new Error("Facility not found");
@@ -278,18 +276,16 @@ async function createBooking(data, user) {
     // -------------------
 
     if (couponApplied?.couponId) {
-
       const provider = await ServiceProvider.findOne({
         $or: [
           { _id: facility.serviceProviderId },
-          { userId: facility.serviceProviderId }
-        ]
+          { userId: facility.serviceProviderId },
+        ],
       });
 
       if (provider?.coupons?.length) {
-
         const index = provider.coupons.findIndex(
-          c => c._id.toString() === couponApplied.couponId
+          (c) => c._id.toString() === couponApplied.couponId,
         );
 
         if (index !== -1) {
@@ -304,7 +300,6 @@ async function createBooking(data, user) {
     // -------------------
 
     const booking = await Booking.create({
-
       startupId: user.id,
       facilityId,
       incubatorId: facility.serviceProviderId,
@@ -335,30 +330,26 @@ async function createBooking(data, user) {
       status: "pending",
       paymentStatus: "pending",
 
-      requestedAt: new Date()
-
+      requestedAt: new Date(),
     });
 
     return {
       success: true,
       bookingId: booking._id,
-      data: booking
+      data: booking,
     };
-
   } catch (error) {
     console.error("Create booking error:", error);
 
     return {
       success: false,
-      message: error.message
+      message: error.message,
     };
   }
 }
 
 async function getBookings(query, user) {
-
   try {
-
     const detailed = query.detailed === "true";
     const startDateParam = query.startDate;
     const endDateParam = query.endDate;
@@ -368,11 +359,10 @@ async function getBookings(query, user) {
     // -------------------------
 
     const filter = {
-      incubatorId: user.id
+      incubatorId: user.id,
     };
 
     if (startDateParam || endDateParam) {
-
       filter.startDate = {};
 
       if (startDateParam) {
@@ -475,39 +465,35 @@ const formattedBookings = bookings.map(b => {
     // -------------------------
 
     if (detailed) {
-
       const now = new Date();
       const startOfToday = new Date(
         now.getFullYear(),
         now.getMonth(),
-        now.getDate()
+        now.getDate(),
       );
 
-      const startOfMonth = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        1
-      );
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-      const todayBookings = formattedBookings.filter(b =>
-        new Date(b.startDate) >= startOfToday
+      const todayBookings = formattedBookings.filter(
+        (b) => new Date(b.startDate) >= startOfToday,
       ).length;
 
-      const totalBookingsThisMonth = formattedBookings.filter(b =>
-        new Date(b.startDate) >= startOfMonth
+      const totalBookingsThisMonth = formattedBookings.filter(
+        (b) => new Date(b.startDate) >= startOfMonth,
       ).length;
 
-      const completedBookings = formattedBookings.filter(b =>
-        b.status?.toLowerCase() === "approved"
+      const completedBookings = formattedBookings.filter(
+        (b) => b.status?.toLowerCase() === "approved",
       ).length;
 
-      const rejectedCancelledBookings = formattedBookings.filter(b =>
-        b.status?.toLowerCase() === "rejected" ||
-        b.status?.toLowerCase() === "cancelled"
+      const rejectedCancelledBookings = formattedBookings.filter(
+        (b) =>
+          b.status?.toLowerCase() === "rejected" ||
+          b.status?.toLowerCase() === "cancelled",
       ).length;
 
-      const pendingBookings = formattedBookings.filter(b =>
-        b.status?.toLowerCase() === "pending"
+      const pendingBookings = formattedBookings.filter(
+        (b) => b.status?.toLowerCase() === "pending",
       ).length;
 
       return {
@@ -518,52 +504,46 @@ const formattedBookings = bookings.map(b => {
           todayBookings,
           completedBookings,
           rejectedCancelledBookings,
-          pendingBookings
-        }
+          pendingBookings,
+        },
       };
     }
 
     return {
       success: true,
-      bookings: formattedBookings
+      bookings: formattedBookings,
     };
-
   } catch (error) {
-
     console.error("Get bookings error:", error);
 
     return {
       success: false,
-      message: "Failed to fetch bookings"
+      message: "Failed to fetch bookings",
     };
   }
 }
 
 async function getBookingById(bookingId, user) {
-
   try {
-
     // -------------------------
     // Authorization Filter
     // -------------------------
 
     const booking = await Booking.findOne({
       _id: bookingId,
-      $or: [
-        { startupId: user.id },
-        { incubatorId: user.id }
-      ]
+      $or: [{ startupId: user.id }, { incubatorId: user.id }],
     })
       .populate({
         path: "facilityId",
-        select: "details.name facilityType address city state country serviceProviderId"
+        select:
+          "details.name facilityType address city state country serviceProviderId",
       })
       .lean();
 
     if (!booking) {
       return {
         success: false,
-        message: "Booking not found"
+        message: "Booking not found",
       };
     }
 
@@ -585,7 +565,6 @@ async function getBookingById(bookingId, user) {
     // -------------------------
 
     const response = {
-
       _id: booking._id,
       bookingId: booking._id, 
 
@@ -628,33 +607,29 @@ bookedBy: booking.startupId,
 
       whatsappNumber: booking.whatsappNumber,
       invoiceUrl: booking.invoiceUrl,
-      invoiceEmailHistory: booking.invoiceEmailHistory
+      invoiceEmailHistory: booking.invoiceEmailHistory,
     };
 
     return {
       success: true,
-      booking: response
+      booking: response,
     };
-
   } catch (error) {
-
     console.error("Get booking by id error:", error);
 
     return {
       success: false,
-      message: "Failed to fetch booking details"
+      message: "Failed to fetch booking details",
     };
   }
 }
 
 async function getFailedBooking(facilityId, user) {
-
   try {
-
     if (!facilityId) {
       return {
         success: false,
-        message: "Facility ID is required"
+        message: "Facility ID is required",
       };
     }
 
@@ -667,7 +642,7 @@ async function getFailedBooking(facilityId, user) {
       facilityId: facilityId,
       startupId: user.id,
       paymentStatus: "failed",
-      expiresAt: { $gt: new Date() }
+      expiresAt: { $gt: new Date() },
     })
       .sort({ updatedAt: -1 })
       .select("_id")
@@ -675,36 +650,30 @@ async function getFailedBooking(facilityId, user) {
 
     return {
       success: true,
-      bookingId: booking ? booking._id : null
+      bookingId: booking ? booking._id : null,
     };
-
   } catch (error) {
-
     console.error("Get failed booking error:", error);
 
     return {
       success: false,
-      message: "Failed to check failed payments"
+      message: "Failed to check failed payments",
     };
   }
 }
 
-
 async function updateBookingStatus(bookingId, newStatus, previousStatus) {
   try {
-
     // -------------------------
     // Fetch Booking
     // -------------------------
 
-    const booking = await Booking.findById(bookingId)
+    const booking = await Booking.findById(bookingId);
 
     if (!booking) {
-   
-
       return {
         success: false,
-        message: "Booking not found"
+        message: "Booking not found",
       };
     }
 
@@ -728,9 +697,28 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
       newStatus.toLowerCase() === "approved" &&
       previousStatus.toLowerCase() === "pending"
     ) {
-
       // Fetch enriched booking details
       const bookingDetails = await fetchBookingDetailsForWebhook(bookingId);
+
+      // Generate Invoice & Save URL
+      try {
+        const invoiceUrl = await generateAndStoreInvoice(bookingId);
+
+        if (invoiceUrl) {
+          await Booking.findByIdAndUpdate(
+            bookingId,
+            {
+              invoiceUrl,
+              invoiceGeneratedAt: new Date(),
+            },
+            { new: true },
+          );
+
+          console.log("✅ Invoice generated and saved:", invoiceUrl);
+        }
+      } catch (err) {
+        console.error("❌ Invoice generation failed:", err.message);
+      }
 
       // Fallbacks
       bookingDetails.facilityName =
@@ -741,14 +729,17 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
 
       // Auto calculate endDate if missing
       if (!bookingDetails.endDate && bookingDetails.startDate) {
-
         const endDate = new Date(bookingDetails.startDate);
         const rentalPlan = bookingDetails.rentalPlan || "Monthly";
 
-        if (rentalPlan === "Annual") endDate.setFullYear(endDate.getFullYear() + 1);
-        else if (rentalPlan === "Monthly") endDate.setMonth(endDate.getMonth() + 1);
-        else if (rentalPlan === "Weekly") endDate.setDate(endDate.getDate() + 7);
-        else if (rentalPlan.includes("Day")) endDate.setDate(endDate.getDate() + 1);
+        if (rentalPlan === "Annual")
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        else if (rentalPlan === "Monthly")
+          endDate.setMonth(endDate.getMonth() + 1);
+        else if (rentalPlan === "Weekly")
+          endDate.setDate(endDate.getDate() + 7);
+        else if (rentalPlan.includes("Day"))
+          endDate.setDate(endDate.getDate() + 1);
 
         bookingDetails.endDate = endDate;
       }
@@ -768,7 +759,6 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
       // -------------------------
 
       const webhookPayload = {
-
         bookingId,
         status: newStatus,
         previousStatus,
@@ -782,25 +772,24 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
         startDate: bookingDetails.startDate,
         endDate: bookingDetails.endDate,
 
-        facilityType: bookingDetails.facilityType
+        facilityType: bookingDetails.facilityType,
       };
 
       const webhookUrl = process.env.BOOKING_WEBHOOK_URL;
       const webhookSecret = process.env.WEBHOOK_SECRET;
 
       if (webhookSecret) {
-
         webhookSent = await sendSignedWebhook({
           url: webhookUrl,
           payload: webhookPayload,
-          secret: webhookSecret
+          secret: webhookSecret,
         });
 
         await logWebhookDelivery(
           "booking-status-change",
           webhookPayload,
           webhookSent,
-          webhookSent ? null : "Webhook delivery failed"
+          webhookSent ? null : "Webhook delivery failed",
         );
       }
     }
@@ -812,27 +801,22 @@ async function updateBookingStatus(bookingId, newStatus, previousStatus) {
     return {
       success: true,
       webhookSent,
-      message: "Booking status updated"
+      message: "Booking status updated",
     };
-
   } catch (error) {
-
     console.error("Update booking status error:", error);
 
     return {
       success: false,
-      message: "Booking status update failed"
+      message: "Booking status update failed",
     };
   }
 }
 
 async function createBookingApprovalNotification(bookingId, bookingDetails) {
-
-  const formatDate = (date) =>
-    new Date(date).toISOString().split("T")[0];
+  const formatDate = (date) => new Date(date).toISOString().split("T")[0];
 
   const notification = {
-
     userId: bookingDetails.startupId,
 
     type: "booking-approved",
@@ -854,15 +838,14 @@ async function createBookingApprovalNotification(bookingId, bookingDetails) {
       startupName: bookingDetails.startupName,
       facilityType: bookingDetails.facilityType,
       startDate: formatDate(bookingDetails.startDate),
-      endDate: formatDate(bookingDetails.endDate)
-    }
+      endDate: formatDate(bookingDetails.endDate),
+    },
   };
 
-await mongoose.connection.collection("notifications").insertOne(notification);
+  await mongoose.connection.collection("notifications").insertOne(notification);
 }
 
 async function fetchBookingDetailsForWebhook(bookingId) {
-
   const booking = await Booking.findById(bookingId)
     .populate("facilityId")
     .populate("startupId")
@@ -873,7 +856,6 @@ async function fetchBookingDetailsForWebhook(bookingId) {
   }
 
   return {
-
     ...booking,
 
     facilityName: booking.facilityId?.details?.name,
@@ -882,18 +864,14 @@ async function fetchBookingDetailsForWebhook(bookingId) {
     startupName: booking.startupId?.startupName,
 
     startDate: booking.startDate || booking.requestedAt,
-    endDate: booking.endDate
+    endDate: booking.endDate,
   };
 }
-
 
 module.exports = {
   createBooking,
   getBookings,
   getBookingById,
   getFailedBooking,
-  updateBookingStatus
+  updateBookingStatus,
 };
-
-
-

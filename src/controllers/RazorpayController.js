@@ -6,6 +6,7 @@ const Facility = require('../models/Facility');
 const Startup = require('../models/Startup');
 const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
 const Notification = require('../models/Notification'); // Ensure y
+const { generateAndStoreInvoice } = require("../../services/invoiceService");
 const { verifyPaymentSignature } = require("../../utils/razorpay");
 
 
@@ -427,7 +428,29 @@ exports.verifyPaymentSignatureFacilityBooking = async (req, res) => {
       { new: true }
     );
 
-    return res.status(200).json({ isValid: true, success: true, message: 'Signature verified' });
+    setImmediate(async () => {
+      try {
+        console.log("🧾 Generating invoice for booking:", bookingId);
+
+        const result = await generateAndStoreInvoice(bookingId);
+
+        if (result.success) {
+          console.log("✅ Invoice Generated:", result.invoiceUrl);
+        } else {
+          console.log("❌ Invoice Failed:", result.message);
+        }
+      } catch (err) {
+        console.error("❌ Invoice generation error:", err);
+      }
+    }).unref();
+
+    return res.status(200).json({
+      isValid: true,
+      success: true,
+      message: "Signature verified",
+      booking: updatedBooking,
+    });
+
   // runPostBookingTasks(updatedBooking).catch(err => 
   //     console.error(`Background task error for booking ${bookingId}:`, err)
   //   );
