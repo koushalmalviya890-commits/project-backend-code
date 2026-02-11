@@ -608,7 +608,7 @@ exports.searchFacilities = async (req, res) => {
     // Base Query
     const query = {
       status: 'active',
-      // privacyType: 'public' // Uncomment if you added this field to Schema
+      privacyType: 'public' // Uncomment if you added this field to Schema
     };
 
     if (isFeatured) {

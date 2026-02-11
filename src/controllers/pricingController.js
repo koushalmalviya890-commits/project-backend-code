@@ -187,7 +187,7 @@ exports.calculateFinalPrice = async (req, res) => {
         fixedFee,
         hasGST,
         isExistingUser,
-        gst: hasGST ? Math.round(gst) : 0,
+        gstAmount: hasGST ? Math.round(gst) : 0,
         finalPrice: Math.round(finalPrice),
         finalPricebeforeGST: Math.round(finalPricebeforeGST),
         distanceInKm: Math.round(distanceInKm),

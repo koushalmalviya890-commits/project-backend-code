@@ -392,53 +392,83 @@ async function getBookings(query, user) {
     // Fetch Bookings
     // -------------------------
 
-    const bookings = await Booking.find(filter)
-      .populate({
-        path: "facilityId",
-        select: "facilityType details.name"
-      })
-      .populate({
-        path: "startupId",
-        select: "startupName logoUrl"
-      })
+   const bookings = await Booking.find(filter)
       .sort({ requestedAt: -1 })
       .lean();
+
+    if (!bookings.length) {
+        return { success: true, bookings: [] };
+    }
+
+    // -------------------------
+    // 3. Manual Lookup (The Fix)
+    // -------------------------
+
+    // A. Extract IDs
+    const facilityIds = [...new Set(bookings.map(b => b.facilityId))];
+    const startupUserIds = [...new Set(bookings.map(b => b.startupId))];
+
+    // B. Fetch Related Data in Bulk
+    // Fetch Facilities (Standard _id lookup)
+    const facilities = await Facility.find({ _id: { $in: facilityIds } })
+      .select("facilityType details.name")
+      .lean();
+
+    // Fetch Startups (Lookup by userId, not _id)
+    const startups = await Startup.find({ userId: { $in: startupUserIds } })
+      .select("userId startupName logoUrl")
+      .lean();
+
+    // C. Create Maps for O(1) Access
+    const facilityMap = {};
+    facilities.forEach(f => {
+        facilityMap[f._id.toString()] = f;
+    });
+
+    const startupMap = {};
+    startups.forEach(s => {
+        // Map using userId because that is what's stored in the Booking
+        if (s.userId) {
+            startupMap[s.userId.toString()] = s;
+        }
+    });
 
     // -------------------------
     // Shape Response
     // -------------------------
+const formattedBookings = bookings.map(b => {
+      // Safe lookups
+      const fId = b.facilityId ? b.facilityId.toString() : "null";
+      const sId = b.startupId ? b.startupId.toString() : "null";
 
-    const formattedBookings = bookings.map(b => ({
+      const facility = facilityMap[fId] || {};
+      const startup = startupMap[sId] || {};
 
-      bookingId: b._id,
+      return {
+        bookingId: b._id,
 
-      startupDetails: {
-        logoUrl: b.startupId?.logoUrl || "/placeholder-logo.png",
-        startupName: b.startupId?.startupName || "Unknown Startup"
-      },
+        startupDetails: {
+          logoUrl: startup.logoUrl || "/placeholder-logo.png",
+          startupName: startup.startupName || "Unknown Startup"
+        },
 
-      facilityType: b.facilityId?.facilityType || "Unknown Type",
-      facilityName: b.facilityId?.details?.name || "Unknown Facility",
+        facilityType: facility.facilityType || "Unknown Type",
+        facilityName: facility.details?.name || "Unknown Facility",
 
-      bookedOn: b.requestedAt || b.createdAt,
-
-      startDate: b.startDate,
-      endDate: b.endDate,
-
-      rentalPlan: b.rentalPlan,
-
-      amount: b.amount,
-      baseAmount: b.baseAmount,
-      gstAmount: b.gstAmount,
-
-      status: b.status,
-      paymentStatus: b.paymentStatus,
-
-      whatsappNumber: b.whatsappNumber,
-      invoiceUrl: b.invoiceUrl,
-
-      bookingSeats: b.bookingSeats
-    }));
+        bookedOn: b.requestedAt || b.createdAt,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        rentalPlan: b.rentalPlan,
+        amount: b.amount,
+        baseAmount: b.baseAmount,
+        gstAmount: b.gstAmount,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        whatsappNumber: b.whatsappNumber,
+        invoiceUrl: b.invoiceUrl,
+        bookingSeats: b.bookingSeats
+      };
+    });
 
     // -------------------------
     // Metrics Calculation
@@ -528,10 +558,6 @@ async function getBookingById(bookingId, user) {
         path: "facilityId",
         select: "details.name facilityType address city state country serviceProviderId"
       })
-      .populate({
-        path: "startupId",
-        select: "startupName"
-      })
       .lean();
 
     if (!booking) {
@@ -542,16 +568,31 @@ async function getBookingById(bookingId, user) {
     }
 
     // -------------------------
+    // 2. Manual Lookup for Startup (The Fix)
+    // -------------------------
+    // Since booking.startupId holds the userId, we must search by that field
+    const startup = await Startup.findOne({ userId: booking.startupId })
+      .select("startupName")
+      .lean();
+
+    // -------------------------
+    // 3. Shape Response
+    // -------------------------
+    const facility = booking.facilityId || {};
+
+    // -------------------------
     // Shape Response
     // -------------------------
 
     const response = {
 
       _id: booking._id,
+      bookingId: booking._id, 
 
-      facilityId: booking.facilityId?._id,
-      facilityName: booking.facilityId?.details?.name,
-      facilityType: booking.facilityId?.facilityType,
+      facilityId: facility._id,
+      facilityName: facility.details?.name || "Unknown Facility",
+      facilityType: facility.facilityType,
+      
 
       startDate: booking.startDate,
       endDate: booking.endDate,
@@ -573,14 +614,17 @@ async function getBookingById(bookingId, user) {
       bookingSeats: booking.bookingSeats,
       processedAt: booking.processedAt,
 
-      address: booking.facilityId?.address,
-      city: booking.facilityId?.city,
-      state: booking.facilityId?.state,
-      country: booking.facilityId?.country,
+  address: facility.address,
+      city: facility.city,
+      state: facility.state,
+      country: facility.country,
 
-      serviceProviderId: booking.facilityId?.serviceProviderId,
+      serviceProviderId: facility.serviceProviderId,
 
-      bookedBy: booking.startupId?._id,
+bookedBy: booking.startupId, 
+      bookedByName: startup ? startup.startupName : "Unknown Startup",       
+      // Keep the ID just in case
+      startupId: booking.startupId,
 
       whatsappNumber: booking.whatsappNumber,
       invoiceUrl: booking.invoiceUrl,
@@ -612,6 +656,11 @@ async function getFailedBooking(facilityId, user) {
         success: false,
         message: "Facility ID is required"
       };
+    }
+
+    // Ensure user.id is valid before querying
+    if (!user || !user.id) {
+        return { success: false, message: "User not authenticated" };
     }
 
     const booking = await Booking.findOne({

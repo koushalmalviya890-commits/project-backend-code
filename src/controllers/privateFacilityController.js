@@ -75,11 +75,23 @@ exports.searchPrivateFacilities = async (req, res) => {
     const page = parseInt(req.query.page || '1');
     const search = req.query.search || '';
     const searchScope = req.query.searchScope || 'full';
+    const listingStatus = req.query.listingStatus || 'All';
+    const propertyTypesParam = req.query.propertyTypes || 'All';
+    const minPrice = parseInt(req.query.minPrice || '0');
+    const maxPrice = parseInt(req.query.maxPrice || '100000');
+    const location = req.query.location || '';
+    const sortBy = req.query.sortBy || 'newest';
+    const isFeatured = req.query.isFeatured === 'true';
+    const city = req.query.city || '';
+    const state = req.query.state || '';
+    const facilityType = req.query.facilityType || '';
     
     // ... [Reuse filters for listingStatus, minPrice, etc.] ...
     // Assuming standard filters are passed
     
-    if (!userId) return res.status(400).json({ error: 'Provider ID required' });
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Valid Provider ID required' });
+    }
 
     const query = {
       serviceProviderId: new mongoose.Types.ObjectId(userId),
@@ -87,7 +99,7 @@ exports.searchPrivateFacilities = async (req, res) => {
       // privacyType: 'private' // Optional: Enforce private only? Next.js code didn't strictly enforce it here.
     };
 
-    if (req.query.isFeatured === 'true') query.isFeatured = true;
+    if (isFeatured) query.isFeatured = true;
 
     // Search Logic
     if (search) {
@@ -114,7 +126,7 @@ exports.searchPrivateFacilities = async (req, res) => {
       }
     }
 
-  if (location) {
+    if (location) {
       const locationQuery = [
         { address: { $regex: location, $options: 'i' } },
         { city: { $regex: location, $options: 'i' } },
@@ -195,7 +207,7 @@ exports.searchPrivateFacilities = async (req, res) => {
         }
       },
       { $unwind: { path: '$serviceProvider', preserveNullAndEmptyArrays: true } },
-      { $sort: { isFeatured: -1, createdAt: -1 } },
+      { $sort: sortOptions },
       { $skip: skip },
       { $limit: ITEMS_PER_PAGE }
     ]);
