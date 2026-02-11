@@ -196,7 +196,7 @@ const serviceProviderSchema = new Schema(
 
 module.exports =
   mongoose.models.ServiceProvider ||
-  mongoose.model("Service Provider", serviceProviderSchema, "Service Provider");
+  mongoose.model("ServiceProvider", serviceProviderSchema, "Service Provider");
 // module.exports = mongoose.models.Facilities || mongoose.model('Facilities', facilitySchema, 'Facilities');
 
 //   facilityTypes: { type: [String] },

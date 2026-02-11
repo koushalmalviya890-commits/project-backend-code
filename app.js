@@ -25,6 +25,8 @@ const reviewsRoutes = require("./src/routes/reviewsRoutes");
 const fetchStartupsRoutes = require("./src/routes/fetchStartupsRoutes");
 const serviceProviderRoutes = require("./src/routes/serviceProviderRoutes");
 const newsletterRoutes = require("./src/routes/newsletterRoutes");
+const invoiceRoutes = require("./src/routes/invoiceRoutes");
+const webhookRoutes = require("./src/routes/webhookRoutes");
 const privateFacilityRoutes = require("./src/routes/privateFacilityRoutes");
 // const facilityBookingRoutes = require("./src/routes/facilityBookingRoutes");
 const dashboardRoutes = require("./src/routes/dashboardRoutes");
@@ -165,6 +167,8 @@ app.use("/api/fetch-startups", fetchStartupsRoutes); // Fetch Startups routes
 app.use("/api/startup", startupRoutes); // Startup routes
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/newsletter", newsletterRoutes);
+app.use("/api/invoices", invoiceRoutes);
+app.use("/api/webhooks", webhookRoutes);
 // app.use("/api/startup", startupRoutes);
 
 //app.use("/api/extent-bookings", extentBookingRoutes);
@@ -172,7 +176,8 @@ app.use('/api/private-facilities', privateFacilityRoutes);
 app.use("/api/extent-booking", extentBookingRoutes);
 // app.use("/api", facilityBookingRoutes)
 
-
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
 
 // ---------------------------
 // Error handling
