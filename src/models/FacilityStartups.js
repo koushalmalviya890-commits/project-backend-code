@@ -4,12 +4,12 @@ const FacilityStartupsSchema = new mongoose.Schema({
   startupId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'Startup'
+    ref: 'Startups'
   },
   incubatorId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'User'
+    ref: 'Service Provider'
   }
 }, {
   timestamps: true,

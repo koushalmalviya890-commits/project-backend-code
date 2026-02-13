@@ -50,17 +50,16 @@ function getFixedServiceFee(facilityType) {
 
 exports.calculateFinalPrice = async (req, res) => {
   try {
-    const { facilityId, rentalPlan, unitCount, bookingSeats, basePrice: inputBasePrice } = req.body;
+    // 1. Extract Inputs (Ignore 'basePrice' from frontend for security)
+    const { facilityId, rentalPlan, unitCount, bookingSeats } = req.body;
 
-    // 1. Validation
-    if (!facilityId) {
-      return res.status(400).json({ error: "Missing facilityId" });
+    if (!facilityId || !rentalPlan || !unitCount) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
 
     // 2. Identify User
     const userId = req.user ? req.user.id : null;
     let startup = null;
-
     if (userId) {
       startup = await Startup.findOne({ userId: userId });
     }
@@ -71,25 +70,26 @@ exports.calculateFinalPrice = async (req, res) => {
       return res.status(404).json({ error: "Facility not found" });
     }
 
-    // 4. Determine Base Price
-    // If frontend sends basePrice, use it. Otherwise calculate it from plan.
-    let basePrice = inputBasePrice;
+    // 4. Find the Specific Rental Plan (Robust Search)
+    // We search the array for the plan matching the name sent from frontend
+    const selectedPlan = facility.details?.rentalPlans?.find(
+      (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+    );
+
+    if (!selectedPlan) {
+      return res.status(404).json({ error: `Rental plan '${rentalPlan}' not found in this facility` });
+    }
+
+    // 5. Calculate Base Price (Server Side Source of Truth)
+    // Formula: Price Per Unit * Number of Units * Number of Seats
+    const seats = parseInt(bookingSeats) || 1;
+    const units = parseInt(unitCount) || 1;
+    const planPrice = parseFloat(selectedPlan.price) || 0;
     
-    if (!basePrice && rentalPlan && unitCount) {
-       const plan = facility.details?.rentalPlans?.find(
-        (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
-      );
-      if (plan) {
-        basePrice = plan.price * unitCount * (bookingSeats || 1);
-      }
-    }
+    const basePrice = planPrice * units * seats;
+    console.log(basePrice ,"Base price with only plans")
 
-    if (!basePrice) {
-       // If we still don't have a price, we can't calculate
-       return res.status(400).json({ error: "Could not determine base price. Please provide rentalPlan and unitCount." });
-    }
-
-    // 5. Fetch Service Provider
+    // 6. Fetch Service Provider
     const serviceProvider = await ServiceProvider.findOne({
       userId: facility.serviceProviderId,
     });
@@ -98,100 +98,58 @@ exports.calculateFinalPrice = async (req, res) => {
       return res.status(404).json({ error: "Service Provider not found" });
     }
 
-    // 6. Setup Variables
-    const hasGST = !!serviceProvider.gstNumber; // Check existing boolean logic
+    // 7. Calculate Fees & Taxes
+    const hasGST = !!serviceProvider.gstNumber;
     let fixedFee = 0;
     let gst = 0;
     let finalPrice = 0;
     let finalPricebeforeGST = 0;
-    let distanceInKm = 0;
     let isExistingUser = false;
 
-    // =========================================================
-    // LOGIC BRANCH: Guest OR Startup Not Found
-    // =========================================================
-    if (!startup) {
-      isExistingUser = false; // Forced false for guests
-      
-      const rate = 0.07;
-      fixedFee = basePrice * rate;
-
-      if (hasGST) {
-        gst = basePrice * 0.18; // GST only on base price
-        finalPrice = basePrice + gst + fixedFee;
-        finalPricebeforeGST = basePrice + fixedFee;
-      } else {
-        gst = 0;
-        finalPrice = basePrice + fixedFee;
-        finalPricebeforeGST = basePrice + fixedFee;
-      }
-    } 
-    // =========================================================
-    // LOGIC BRANCH: Logged-in Startup
-    // =========================================================
-    else {
-      // Check FacilityStartups relation
-      const data = await FacilityStartups.findOne({
-        incubatorId: serviceProvider.userId,
+    // Check if user is "Existing" (Already linked to this incubator)
+    if (startup) {
+      const relation = await FacilityStartups.findOne({
+        incubatorId: new mongoose.Types.ObjectId(serviceProvider.userId),
         startupId: startup.userId
       });
-      isExistingUser = !!data;
-
-      if (isExistingUser) {
-        // --- EXISTING USER LOGIC ---
-        fixedFee = getFixedServiceFee(facility.facilityType);
-        // Note: Your original code did NOT multiply fixedFee by unitCount here, 
-        // but if you need to, uncomment: fixedFee = fixedFee * unitCount;
-
-        if (hasGST) {
-          gst = basePrice * 0.18;
-          finalPrice = basePrice + gst + fixedFee;
-          finalPricebeforeGST = basePrice + fixedFee;
-        } else {
-          finalPrice = basePrice + fixedFee;
-          finalPricebeforeGST = basePrice + fixedFee;
-        }
-      } 
-      else {
-        // --- NEW USER LOGIC (Distance) ---
-        // Optional: Calculate distance if needed for logs, though rate is currently hardcoded 0.07
-        const startupPincode = startup.pincode;
-        const facilityPincode = facility.pincode;
-        
-        // Uncomment if you want to calc actual distance
-        // try {
-        //   distanceInKm = await getDistanceInKm(`${startupPincode}`, `${facilityPincode}`);
-        // } catch (e) {}
-
-        const rate = 0.07;
-        fixedFee = basePrice * rate;
-
-        if (hasGST) {
-          gst = basePrice * 0.18;
-          finalPrice = basePrice + gst + fixedFee;
-          finalPricebeforeGST = basePrice + fixedFee;
-        } else {
-          gst = 0;
-          finalPrice = basePrice + fixedFee;
-          finalPricebeforeGST = basePrice + fixedFee;
-        }
-      }
+      isExistingUser = !!relation;
     }
 
-    // 7. Return Response
-    // Matches the structure expected by your FacilityCard
+    // --- FEE LOGIC ---
+    if (isExistingUser) {
+      // Existing User: Flat Fee
+      // Note: Ensure getFixedServiceFee is imported
+      fixedFee = getFixedServiceFee(facility.facilityType || "") * units * seats; 
+      console.log(fixedFee, "fixedfee:::::")
+    } else {
+      // New User / Guest: 7% Commission
+      fixedFee = (basePrice * 0.07);
+      console.log(fixedFee, "fixedfee:::::")
+    }
+
+    // --- TOTAL LOGIC ---
+    // GST is calculated on the Base Price (Rent) 
+    // (Check if your business logic requires GST on the Service Fee too)
+    if (hasGST) {
+      gst = (basePrice + fixedFee) * 0.18;
+    }
+console.log("gst", gst)
+    finalPricebeforeGST = basePrice + fixedFee;
+    console.log(finalPricebeforeGST)
+    finalPrice = finalPricebeforeGST + gst;
+console.log(finalPrice)
+    // 8. Return Response
     res.json({
       success: true,
       data: {
-        basePrice,
-        fixedFee,
+        basePrice: basePrice, // Raw Rent
+        fixedFee: fixedFee,   // Service Fee
+        gstAmount: gst,       // Tax
+        finalPrice: finalPrice, // Total to Pay
+        finalPricebeforeGST: finalPricebeforeGST,
         hasGST,
         isExistingUser,
-        gstAmount: hasGST ? Math.round(gst) : 0,
-        finalPrice: Math.round(finalPrice),
-        finalPricebeforeGST: Math.round(finalPricebeforeGST),
-        distanceInKm: Math.round(distanceInKm),
-        bookingSeats: bookingSeats || 1
+        bookingSeats: seats
       }
     });
 

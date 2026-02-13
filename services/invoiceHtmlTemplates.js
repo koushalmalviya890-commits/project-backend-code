@@ -45,7 +45,7 @@ function generateProfessionalInvoiceHTML(data) {
   const originalBaseAmount = booking.baseAmount + serviceFee || 0;
   const gstOnServiceFee = serviceFee * 0.18;
   const gstAmount = booking.gstAmount || 0;
-  const totalGst = gstOnServiceFee + gstAmount;
+  const totalGst = gstAmount;
 
   const totalAmount = Number(booking.finalAmount ?? booking.amount ?? 0);
 
