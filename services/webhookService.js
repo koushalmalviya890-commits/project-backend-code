@@ -19,7 +19,7 @@ function generateSignature(payload, secret, timestamp) {
   const signedPayload = `${timestamp}.${body}`;
 
   return crypto
-    .createHmac("sha256", secret)
+    .createHmac("sha256", process.env.WEBHOOK_SECRET)
     .update(signedPayload)
     .digest("hex");
 }

@@ -13,7 +13,9 @@ const {
   updateBookingStatus,
 } = require("../controllers/BookingController");
 
-router.post("/update-status", verifyWebhookSignature, updateBookingStatus);
+//router.post("/update-status", verifyWebhookSignature, updateBookingStatus);
+
+router.post("/update-status", protect, updateBookingStatus);
 
 // ----------------------------
 // Booking CRUD Routes

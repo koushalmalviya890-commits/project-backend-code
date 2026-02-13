@@ -69,6 +69,7 @@ const cronService = new CronJobService();
 
 app.use(helmet());
 app.use(cors(corsOptions));
+
 app.use(cookieParser());
 
 

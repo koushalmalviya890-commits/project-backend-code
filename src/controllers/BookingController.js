@@ -175,7 +175,7 @@ async function updateBookingStatus(req, res) {
   try {
 
     const { bookingId, status, previousStatus } = req.body;
-
+    console.log(bookingId," ", status," ",previousStatus);
     // Basic validation
     if (!bookingId || !status) {
       return res.status(400).json({
