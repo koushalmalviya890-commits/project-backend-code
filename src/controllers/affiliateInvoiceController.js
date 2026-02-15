@@ -30,6 +30,15 @@ const sendInvoiceEmail = async (
   invoiceUrl
 ) => {
   const transporter = createEmailTransporter();
+  const invoiceSection = invoiceUrl
+    ? `\n  
+    `
+    : `
+  <!-- Invoice Section (Unavailable) -->
+  <p style="font-size: 14px; color: #666; text-align: center;">
+    Your invoice is being generated. We will share it shortly.
+  </p>
+    `;
 
   const mailOptions = {
     from: `"Cumma" <${process.env.EMAIL_FROM}>`,
@@ -66,21 +75,7 @@ const sendInvoiceEmail = async (
   <p style="font-size: 16px; color: #333;">
     When you arrive, please show your booking invoice for access to the space (if asked).
   </p>
- 
-  <!-- Invoice Section -->
-  <div style="text-align: center; margin: 30px 0;">
-    <a href="${invoiceUrl}" style="
-      background-color: #4F46E5;
-      color: white;
-      padding: 12px 24px;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: 500;
-      display: inline-block;
-    ">
-      📥 View Invoice
-    </a>
-  </div>
+  ${invoiceSection}
  
   <!-- Join Cumma Family Section -->
   <div style="margin: 40px 0; padding: 20px; border: 1px solid #eee; border-radius: 8px; background-color: #f9f9ff;">
@@ -88,7 +83,7 @@ const sendInvoiceEmail = async (
       🔑 To access your booking details online and become part of the Cumma family, please set up your account.
     </p>
     <div style="text-align: center; margin: 20px 0;">
-      <a href="https://www.cumma.in/affiliateUser/signIn" style="
+      <a href="http://localhost:3000/affiliateUser/signIn" style="
         background-color: #22c55e;
         color: white;
         padding: 12px 24px;
@@ -181,7 +176,9 @@ exports.sendInvoiceEmailEndpoint = async (req, res) => {
       }
     }
 
-    if (!booking.invoiceUrl) {
+    const allowWithoutInvoice = !!req.body.allowWithoutInvoice;
+
+    if (!booking.invoiceUrl && !allowWithoutInvoice) {
       return res.status(400).json({
         error: "Invoice not available for this booking",
       });
@@ -264,7 +261,7 @@ exports.sendInvoiceEmailEndpoint = async (req, res) => {
         facility.facilityType || "N/A",
         booking._id.toString(),
         booking.amount,
-        booking.invoiceUrl
+        booking.invoiceUrl || null
       );
 
       emailSent = true;
@@ -351,3 +348,5 @@ exports.sendInvoiceEmailEndpoint = async (req, res) => {
     });
   }
 };
+
+

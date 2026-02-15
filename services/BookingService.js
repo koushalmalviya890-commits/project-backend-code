@@ -526,52 +526,72 @@ const formattedBookings = bookings.map(b => {
 async function getBookingById(bookingId, user) {
   try {
     // -------------------------
-    // Authorization Filter
+    // 1. Authorization Filter Logic
     // -------------------------
+    
+    // Default filter: Must match the Booking ID
+    const filter = { _id: bookingId };
 
-    const booking = await Booking.findOne({
-      _id: bookingId,
-      $or: [{ startupId: user.id }, { incubatorId: user.id }],
-    })
+    // If a user is logged in, restrict access to the owner or provider
+    if (user && user.id) {
+      filter.$or = [
+        { startupId: user.id }, 
+        { incubatorId: user.id }
+      ];
+    } 
+    // If NO user is logged in (Guest/Affiliate flow), 
+    // we only find bookings that are explicitly marked as affiliate bookings.
+    // This prevents random guests from querying normal private bookings.
+    else {
+      filter.affiliateUserEmail = { $ne: null }; // Only find if it has an affiliate email
+    }
+
+    // -------------------------
+    // 2. Fetch Booking
+    // -------------------------
+    const booking = await Booking.findOne(filter)
       .populate({
         path: "facilityId",
-        select:
-          "details.name facilityType address city state country serviceProviderId",
+        select: "details.name facilityType address city state country serviceProviderId",
       })
       .lean();
 
     if (!booking) {
       return {
         success: false,
-        message: "Booking not found",
+        message: "Booking not found or unauthorized",
       };
     }
 
     // -------------------------
-    // 2. Manual Lookup for Startup (The Fix)
+    // 3. Manual Lookup for Startup (If applicable)
     // -------------------------
-    // Since booking.startupId holds the userId, we must search by that field
-    const startup = await Startup.findOne({ userId: booking.startupId })
-      .select("startupName")
-      .lean();
+    let startupName = "Unknown Startup";
+    
+    // For Affiliate bookings, use the email or a placeholder
+    if (booking.affiliateUserEmail) {
+        startupName = booking.affiliateUserEmail; 
+    } 
+    // For normal bookings, look up the startup profile
+    else if (booking.startupId) {
+        const startup = await Startup.findOne({ userId: booking.startupId })
+          .select("startupName")
+          .lean();
+        if (startup) startupName = startup.startupName;
+    }
 
     // -------------------------
-    // 3. Shape Response
+    // 4. Shape Response
     // -------------------------
     const facility = booking.facilityId || {};
 
-    // -------------------------
-    // Shape Response
-    // -------------------------
-
     const response = {
       _id: booking._id,
-      bookingId: booking._id, 
+      bookingId: booking._id,
 
       facilityId: facility._id,
       facilityName: facility.details?.name || "Unknown Facility",
       facilityType: facility.facilityType,
-      
 
       startDate: booking.startDate,
       endDate: booking.endDate,
@@ -593,16 +613,15 @@ async function getBookingById(bookingId, user) {
       bookingSeats: booking.bookingSeats,
       processedAt: booking.processedAt,
 
-  address: facility.address,
+      address: facility.address,
       city: facility.city,
       state: facility.state,
       country: facility.country,
 
       serviceProviderId: facility.serviceProviderId,
 
-bookedBy: booking.startupId, 
-      bookedByName: startup ? startup.startupName : "Unknown Startup",       
-      // Keep the ID just in case
+      bookedBy: booking.startupId,
+      bookedByName: startupName, // Correctly resolved name
       startupId: booking.startupId,
 
       whatsappNumber: booking.whatsappNumber,
@@ -616,7 +635,6 @@ bookedBy: booking.startupId,
     };
   } catch (error) {
     console.error("Get booking by id error:", error);
-
     return {
       success: false,
       message: "Failed to fetch booking details",

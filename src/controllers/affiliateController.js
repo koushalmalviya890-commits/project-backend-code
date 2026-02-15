@@ -1,3 +1,299 @@
+
+//retry-payment
+// exports.retryAffiliatePayment = async (req, res) => {
+//   try {
+//     const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+//     const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+//     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+//       return res.status(500).json({
+//         error: "Payment service not configured",
+//       });
+//     }
+
+//     const razorpayClient = new Razorpay({
+//       key_id: RAZORPAY_KEY_ID,
+//       key_secret: RAZORPAY_KEY_SECRET,
+//     });
+
+//     //  Authentication (Express version of getServerSession)
+//     if (!req.user || !req.user.id) {
+//       return res.status(401).json({ error: "Unauthorized" });
+//     }
+
+//     if (req.user.userType !== "startup") {
+//       return res.status(403).json({
+//         error: "Only startups can retry bookings",
+//       });
+//     }
+
+//     const { bookingId, token } = req.body;
+
+//     if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+//       return res.status(400).json({
+//         error: "Invalid booking ID",
+//       });
+//     }
+
+//     const booking = await mongoose.connection
+//       .collection("bookings")
+//       .findOne({
+//         _id: new mongoose.Types.ObjectId(bookingId),
+//         startupId: new mongoose.Types.ObjectId(req.user.id),
+//       });
+
+//     if (!booking) {
+//       return res.status(404).json({
+//         error: "Booking not found or unauthorized",
+//       });
+//     }
+
+//     //  Token validation (if provided)
+//     if (token && booking.retryToken !== token) {
+//       return res.status(401).json({
+//         error: "Invalid retry token",
+//       });
+//     }
+
+//     // Must be failed
+//     if (booking.paymentStatus !== "failed") {
+//       return res.status(400).json({
+//         error: "This booking is not in a retry-able state",
+//       });
+//     }
+
+//     // Expiry check
+//     if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
+//       return res.status(410).json({
+//         error: "The retry window for this booking has expired",
+//       });
+//     }
+
+//     try {
+//       // Create Razorpay order again
+//       const razorpayOrder = await razorpayClient.orders.create({
+//         amount: Math.round(booking.amount * 100),
+//         currency: "INR",
+//         receipt: booking._id.toString(),
+//         notes: {
+//           bookingId: booking._id.toString(),
+//           facilityId: booking.facilityId.toString(),
+//           startupId: req.user.id,
+//           rentalPlan: booking.rentalPlan,
+//           isRetry: "true",
+//         },
+//       });
+
+//       const retryAttempt = {
+//         razorpayOrderId: razorpayOrder.id,
+//         attemptedAt: new Date(),
+//         status: "pending",
+//       };
+
+//       await mongoose.connection.collection("bookings").updateOne(
+//         { _id: new mongoose.Types.ObjectId(bookingId) },
+//         {
+//           $set: {
+//             razorpayOrderId: razorpayOrder.id,
+//             updatedAt: new Date(),
+//           },
+//           $unset: {
+//             retryToken: "",
+//           },
+//           $push: {
+//             paymentRetries: retryAttempt,
+//           },
+//         }
+//       );
+
+//       return res.status(200).json({
+//         orderId: razorpayOrder.id,
+//         bookingId: bookingId,
+//         amount: booking.amount,
+//         currency: "INR",
+//         keyId: RAZORPAY_KEY_ID,
+//       });
+
+//     } catch (razorpayError) {
+//       return res.status(500).json({
+//         error: "Failed to create retry payment order",
+//         details: razorpayError.message,
+//       });
+//     }
+
+//   } catch (error) {
+//     console.error("Retry Payment Error:", error);
+//     return res.status(500).json({
+//       error: "Failed to create retry payment order",
+//     });
+//   }
+// };
+
+// exports.calculateAffiliatePrice = async (req, res) => {
+//   try {
+//     const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
+
+//     // 1. Validation
+//     if (!facilityId) {
+//       return res.status(400).json({ error: "Missing facilityId" });
+//     }
+
+//     // 2. Fetch Facility
+//     const facility = await Facility.findById(facilityId);
+//     if (!facility) {
+//       return res.status(404).json({ error: "Facility not found" });
+//     }
+
+//     // 3. Determine Base Price
+//     // If frontend sends basePrice, use it. Otherwise calculate from plan.
+//     let basePrice = inputBasePrice;
+    
+//     if (!basePrice && rentalPlan && unitCount) {
+//        const plan = facility.details?.rentalPlans?.find(
+//         (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+//       );
+//       if (plan) {
+//         basePrice = plan.price * unitCount * (bookingSeats || 1);
+//       }
+//     }
+
+//     if (!basePrice) {
+//        return res.status(400).json({ error: "Could not determine base price" });
+//     }
+
+//     // 4. Fetch Service Provider
+//     const serviceProvider = await ServiceProvider.findOne({
+//       userId: facility.serviceProviderId,
+//     });
+    
+//     if (!serviceProvider) {
+//       return res.status(404).json({ error: "Service Provider not found" });
+//     }
+
+//     // 5. Affiliate Pricing Logic
+//     // Logic: Always New User, Rate = 0.07, GST on Total
+//     const hasGST = !!serviceProvider.gstNumber;
+//     const rate = 0.07;
+    
+//     // Fee Calculation
+//     const fixedFee = basePrice * rate;
+//     const totalBeforeGST = basePrice + fixedFee;
+    
+//     let gst = 0;
+//     let finalPrice = 0;
+
+//     if (hasGST) {
+//       // GST is 18% of the Total (Base + Fee)
+//       gst = totalBeforeGST * 0.18;
+//       finalPrice = totalBeforeGST + gst;
+//     } else {
+//       gst = 0;
+//       finalPrice = totalBeforeGST;
+//     }
+
+//     // 6. Return Response
+//     res.json({
+//       success: true,
+//       data: {
+//         basePrice,
+//         fixedFee,
+//         hasGST,
+//         isExistingUser: false, // Affiliate users are always treated as new
+//         gst: Math.round(gst),
+//         finalPrice: Math.round(finalPrice),
+//         distanceInKm: 0 // Not used for affiliates
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("Affiliate Pricing Error:", error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
+
+// exports.calculateAffiliatePrice = async (req, res) => {
+//   try {
+//     const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
+
+//     // 1. Validation
+//     if (!facilityId) {
+//       return res.status(400).json({ error: "Missing facilityId" });
+//     }
+
+//     // 2. Fetch Facility
+//     const facility = await Facility.findById(facilityId);
+//     if (!facility) {
+//       return res.status(404).json({ error: "Facility not found" });
+//     }
+
+//     // 3. Determine Base Price
+//     // If frontend sends basePrice, use it. Otherwise calculate from plan.
+//     let basePrice = inputBasePrice;
+    
+//     if (!basePrice && rentalPlan && unitCount) {
+//        const plan = facility.details?.rentalPlans?.find(
+//         (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
+//       );
+//       if (plan) {
+//         basePrice = plan.price * unitCount * (bookingSeats || 1);
+//       }
+//     }
+
+//     if (!basePrice) {
+//        return res.status(400).json({ error: "Could not determine base price" });
+//     }
+
+//     // 4. Fetch Service Provider
+//     const serviceProvider = await ServiceProvider.findOne({
+//       userId: facility.serviceProviderId,
+//     });
+    
+//     if (!serviceProvider) {
+//       return res.status(404).json({ error: "Service Provider not found" });
+//     }
+
+//     // 5. Affiliate Pricing Logic
+//     // Logic: Always New User, Rate = 0.07, GST on Total
+//     const hasGST = !!serviceProvider.gstNumber;
+//     const rate = 0.07;
+    
+//     // Fee Calculation
+//     const fixedFee = basePrice * rate;
+//     const totalBeforeGST = basePrice + fixedFee;
+    
+//     let gst = 0;
+//     let finalPrice = 0;
+
+//     if (hasGST) {
+//       // GST is 18% of the Total (Base + Fee)
+//       gst = totalBeforeGST * 0.18;
+//       finalPrice = totalBeforeGST + gst;
+//     } else {
+//       gst = 0;
+//       finalPrice = totalBeforeGST;
+//     }
+
+//     // 6. Return Response
+//     res.json({
+//       success: true,
+//       data: {
+//         basePrice,
+//         fixedFee,
+//         hasGST,
+//         isExistingUser: false, // Affiliate users are always treated as new
+//         gst: Math.round(gst),
+//         finalPrice: Math.round(finalPrice),
+//         distanceInKm: 0 // Not used for affiliates
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("Affiliate Pricing Error:", error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 const mongoose = require("mongoose");
 const bcrypt = require('bcryptjs');
 //  import jwt from 'jsonwebtoken';
@@ -12,6 +308,7 @@ const ServiceProvider = require('../models/ServiceProvider.js');
 const Startup = require('../models/Startup.js');
 // import AffiliateLinkUser from '../models/AffiliateLinkUser.js';  
 const AffiliateLinkUser = require('../models/AffiliateLinkUsers.js');
+const Booking = require('../models/Booking.js');
 
 const Facility = require("../models/Facility.js");
 const Razorpay = require("razorpay");
@@ -19,7 +316,8 @@ const Razorpay = require("razorpay");
 const { generateAndStoreInvoice } = require("../../lib/emailAffiliate.js");
 const { addCustomerViaAffiliateLink } = require("../../lib/addCustomerViaAffiliateLink.js");
 const { sendServiceProviderNotificationEmail, sendFacilityContactMail } = require("../../lib/email.js");
-const { logToDB } = require("../../lib/logToDb.js");
+const { logToDB } = require("../../lib/logToDB.js");
+
 
 const generateAuthProviderId = (length = 24) => {
   return crypto.randomBytes(length)
@@ -96,12 +394,8 @@ exports.setAffiliatePassword = async (req, res) => {
       return res.status(400).json({ error: "User not found" });
     }
 
-    // B. Hash Password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // C. Update User
-    user.password = hashedPassword;
+    // B. Update User (User model pre-save hook will hash)
+    user.password = password;
     await user.save();
 
     // D. Ensure Startup Profile Exists (Edge Case Handling)
@@ -359,87 +653,6 @@ exports.registerServiceProvider = async (req, res) => {
 };
 
 
-// exports.calculateAffiliatePrice = async (req, res) => {
-//   try {
-//     const { facilityId, basePrice: inputBasePrice, rentalPlan, unitCount, bookingSeats } = req.body;
-
-//     // 1. Validation
-//     if (!facilityId) {
-//       return res.status(400).json({ error: "Missing facilityId" });
-//     }
-
-//     // 2. Fetch Facility
-//     const facility = await Facility.findById(facilityId);
-//     if (!facility) {
-//       return res.status(404).json({ error: "Facility not found" });
-//     }
-
-//     // 3. Determine Base Price
-//     // If frontend sends basePrice, use it. Otherwise calculate from plan.
-//     let basePrice = inputBasePrice;
-    
-//     if (!basePrice && rentalPlan && unitCount) {
-//        const plan = facility.details?.rentalPlans?.find(
-//         (p) => p.name.toLowerCase().trim() === rentalPlan.toLowerCase().trim()
-//       );
-//       if (plan) {
-//         basePrice = plan.price * unitCount * (bookingSeats || 1);
-//       }
-//     }
-
-//     if (!basePrice) {
-//        return res.status(400).json({ error: "Could not determine base price" });
-//     }
-
-//     // 4. Fetch Service Provider
-//     const serviceProvider = await ServiceProvider.findOne({
-//       userId: facility.serviceProviderId,
-//     });
-    
-//     if (!serviceProvider) {
-//       return res.status(404).json({ error: "Service Provider not found" });
-//     }
-
-//     // 5. Affiliate Pricing Logic
-//     // Logic: Always New User, Rate = 0.07, GST on Total
-//     const hasGST = !!serviceProvider.gstNumber;
-//     const rate = 0.07;
-    
-//     // Fee Calculation
-//     const fixedFee = basePrice * rate;
-//     const totalBeforeGST = basePrice + fixedFee;
-    
-//     let gst = 0;
-//     let finalPrice = 0;
-
-//     if (hasGST) {
-//       // GST is 18% of the Total (Base + Fee)
-//       gst = totalBeforeGST * 0.18;
-//       finalPrice = totalBeforeGST + gst;
-//     } else {
-//       gst = 0;
-//       finalPrice = totalBeforeGST;
-//     }
-
-//     // 6. Return Response
-//     res.json({
-//       success: true,
-//       data: {
-//         basePrice,
-//         fixedFee,
-//         hasGST,
-//         isExistingUser: false, // Affiliate users are always treated as new
-//         gst: Math.round(gst),
-//         finalPrice: Math.round(finalPrice),
-//         distanceInKm: 0 // Not used for affiliates
-//       }
-//     });
-
-//   } catch (error) {
-//     console.error("Affiliate Pricing Error:", error);
-//     res.status(500).json({ success: false, error: error.message });
-//   }
-// };
 
 
 //user
@@ -839,136 +1052,6 @@ exports.createAffiliateOrder = async (req, res) => {
   }
 };
 
-
-//retry-payment
-// exports.retryAffiliatePayment = async (req, res) => {
-//   try {
-//     const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
-//     const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
-
-//     if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-//       return res.status(500).json({
-//         error: "Payment service not configured",
-//       });
-//     }
-
-//     const razorpayClient = new Razorpay({
-//       key_id: RAZORPAY_KEY_ID,
-//       key_secret: RAZORPAY_KEY_SECRET,
-//     });
-
-//     //  Authentication (Express version of getServerSession)
-//     if (!req.user || !req.user.id) {
-//       return res.status(401).json({ error: "Unauthorized" });
-//     }
-
-//     if (req.user.userType !== "startup") {
-//       return res.status(403).json({
-//         error: "Only startups can retry bookings",
-//       });
-//     }
-
-//     const { bookingId, token } = req.body;
-
-//     if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
-//       return res.status(400).json({
-//         error: "Invalid booking ID",
-//       });
-//     }
-
-//     const booking = await mongoose.connection
-//       .collection("bookings")
-//       .findOne({
-//         _id: new mongoose.Types.ObjectId(bookingId),
-//         startupId: new mongoose.Types.ObjectId(req.user.id),
-//       });
-
-//     if (!booking) {
-//       return res.status(404).json({
-//         error: "Booking not found or unauthorized",
-//       });
-//     }
-
-//     //  Token validation (if provided)
-//     if (token && booking.retryToken !== token) {
-//       return res.status(401).json({
-//         error: "Invalid retry token",
-//       });
-//     }
-
-//     // Must be failed
-//     if (booking.paymentStatus !== "failed") {
-//       return res.status(400).json({
-//         error: "This booking is not in a retry-able state",
-//       });
-//     }
-
-//     // Expiry check
-//     if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
-//       return res.status(410).json({
-//         error: "The retry window for this booking has expired",
-//       });
-//     }
-
-//     try {
-//       // Create Razorpay order again
-//       const razorpayOrder = await razorpayClient.orders.create({
-//         amount: Math.round(booking.amount * 100),
-//         currency: "INR",
-//         receipt: booking._id.toString(),
-//         notes: {
-//           bookingId: booking._id.toString(),
-//           facilityId: booking.facilityId.toString(),
-//           startupId: req.user.id,
-//           rentalPlan: booking.rentalPlan,
-//           isRetry: "true",
-//         },
-//       });
-
-//       const retryAttempt = {
-//         razorpayOrderId: razorpayOrder.id,
-//         attemptedAt: new Date(),
-//         status: "pending",
-//       };
-
-//       await mongoose.connection.collection("bookings").updateOne(
-//         { _id: new mongoose.Types.ObjectId(bookingId) },
-//         {
-//           $set: {
-//             razorpayOrderId: razorpayOrder.id,
-//             updatedAt: new Date(),
-//           },
-//           $unset: {
-//             retryToken: "",
-//           },
-//           $push: {
-//             paymentRetries: retryAttempt,
-//           },
-//         }
-//       );
-
-//       return res.status(200).json({
-//         orderId: razorpayOrder.id,
-//         bookingId: bookingId,
-//         amount: booking.amount,
-//         currency: "INR",
-//         keyId: RAZORPAY_KEY_ID,
-//       });
-
-//     } catch (razorpayError) {
-//       return res.status(500).json({
-//         error: "Failed to create retry payment order",
-//         details: razorpayError.message,
-//       });
-//     }
-
-//   } catch (error) {
-//     console.error("Retry Payment Error:", error);
-//     return res.status(500).json({
-//       error: "Failed to create retry payment order",
-//     });
-//   }
-// };
 
 //retry-payment
 exports.retryAffiliatePayment = async (req, res) => {
