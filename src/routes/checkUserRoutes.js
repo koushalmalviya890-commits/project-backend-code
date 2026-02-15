@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middleware/authMiddleware"); 
+const { optionalProtect } = require("../middleware/authMiddleware"); 
 
 const { checkUserController } = require("../controllers/checkUserController");
-router.post("/checkuser", protect, checkUserController);
+router.post("/checkuser", optionalProtect, checkUserController);
 
 module.exports = router;
