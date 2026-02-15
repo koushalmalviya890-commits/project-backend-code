@@ -9,7 +9,8 @@ const FacilityStartupsSchema = new mongoose.Schema({
   incubatorId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'Service Provider'
+    // ref: 'Service Provider'
+    ref: 'ServiceProvider'
   }
 }, {
   timestamps: true,

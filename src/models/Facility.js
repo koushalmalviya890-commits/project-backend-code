@@ -96,7 +96,8 @@ const timingsSchema = new mongoose.Schema({
 const facilitySchema = new mongoose.Schema({
   serviceProviderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Service Provider',
+    //ref: 'Service Provider',
+    ref: 'ServiceProvider',
     required: true,
   },
   facilityType: {

@@ -30,8 +30,9 @@ async function sendInvoiceEmail({
   bookingDates,
   bookingId,
   amount,
-  invoiceUrl,
+  // invoiceUrl,
 }) {
+  console.log("📧 Attempting to send email to:", recipientEmail);
   const transporter = createEmailTransporter();
 
   const mailOptions = {
@@ -60,12 +61,7 @@ async function sendInvoiceEmail({
           <strong>Amount Paid:</strong> ₹${Number(amount).toLocaleString("en-IN")}
         </p>
 
-        <div style="text-align:center; margin: 30px 0;">
-          <a href="${invoiceUrl}" style="background:#4F46E5;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;">
-            📥 View Invoice
-          </a>
-        </div>
-
+        
         <p style="text-align:center;color:#4F46E5;font-style:italic;">
           And hey champion, you save at least 3 papers every time you access through Cumma!
         </p>
@@ -77,6 +73,7 @@ async function sendInvoiceEmail({
       </div>
     `,
   };
+
 
   try {
     await transporter.sendMail(mailOptions);
@@ -102,4 +99,57 @@ async function sendInvoiceEmail({
   }
 }
 
-module.exports = { sendInvoiceEmail };
+async function sendSimpleConfirmationEmail({
+  recipientEmail,
+  startupName,
+  facilityName,
+  bookingDates,
+  bookingId,
+  amount,
+}) {
+  console.log("📧 Attempting to send email to:", recipientEmail);
+  const transporter = createEmailTransporter();
+
+  const mailOptions = {
+    from: `"Cumma" <${process.env.EMAIL_FROM}>`,
+    to: recipientEmail,
+    subject: `Your Booking is Confirmed – Cumma`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>🎉 Booking Confirmed</h2>
+        <p>Hi ${startupName || "there"},</p>
+
+        <p>Your booking has been successfully confirmed.</p>
+
+        <p>
+          <strong>Facility:</strong> ${facilityName}<br/>
+          <strong>Booking ID:</strong> ${bookingId}<br/>
+          <strong>Dates:</strong> ${bookingDates}<br/>
+          <strong>Amount Paid:</strong> ₹${Number(amount).toLocaleString("en-IN")}
+        </p>
+
+        <p>
+          Your invoice is being processed and will be shared shortly.
+        </p>
+
+        <p>Warm regards,<br/>Team Cumma</p>
+      </div>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    return { success: true };
+  } catch (err) {
+    console.error("Fallback email failed:", err);
+    return { success: false, error: err };
+  }
+}
+
+module.exports = { sendInvoiceEmail , sendSimpleConfirmationEmail};
+
+{/*<div style="text-align:center; margin: 30px 0;">
+          <a href="${invoiceUrl}" style="background:#4F46E5;color:white;padding:12px 24px;text-decoration:none;border-radius:6px;">
+            📥 View Invoice
+          </a>
+        </div>*/}

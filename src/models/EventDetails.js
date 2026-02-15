@@ -56,7 +56,8 @@ const eventDetailSchema = new mongoose.Schema({
 
   //Event details Tab
   // Service Provider Link
-  serviceProviderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Service Provider', required: true },
+  // serviceProviderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Service Provider', required: true },
+  serviceProviderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceProvider', required: true },
   serviceProviderName: { type: String },
 
   bookedTicketsCount: { type: Number, default: 0 }, // To track number of booked tickets

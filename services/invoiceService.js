@@ -8,7 +8,7 @@ const Startup = require("../src/models/Startup");
 const ServiceProvider = require("../src/models/ServiceProvider");
 
 const { generateProfessionalInvoiceHTML } = require("./invoiceHtmlTemplates");
-const { sendInvoiceEmail } = require("./invoiceEmailService");
+const { sendInvoiceEmail , sendSimpleConfirmationEmail} = require("./invoiceEmailService");
 
 async function generateAndStoreInvoice(bookingId) {
   try {
@@ -126,7 +126,7 @@ async function generateAndStoreInvoice(bookingId) {
         bookingDates,
         bookingId: bookingId.toString(),
         amount: paidAmount,
-        invoiceUrl,
+        // invoiceUrl,
       });
 
       await Booking.updateOne(
@@ -148,6 +148,42 @@ async function generateAndStoreInvoice(bookingId) {
     return { success: true, invoiceUrl };
   } catch (error) {
     console.error("Invoice generation error:", error);
+    
+    try {
+      // Try fallback email
+      const booking = await Booking.findById(bookingId).lean();
+      const facility = booking ? await Facility.findById(booking.facilityId).lean() : null;
+      const startup =
+        booking
+          ? await Startup.findOne({ userId: booking.startupId }).lean()
+          : null;
+
+      if (booking && facility && startup) {
+        const formattedStartDate = new Date(
+          booking.startDate,
+        ).toLocaleDateString();
+        const formattedEndDate = new Date(
+          booking.endDate,
+        ).toLocaleDateString();
+        const bookingDates = `${formattedStartDate} – ${formattedEndDate}`;
+
+        const paidAmount = Number(booking.finalAmount ?? booking.amount ?? 0);
+        const recipientEmail = startup.startupMailId || startup.email;
+
+        if (recipientEmail) {
+          await sendSimpleConfirmationEmail({
+            recipientEmail,
+            startupName: startup.startupName,
+            facilityName: facility.details?.name,
+            bookingDates,
+            bookingId: bookingId.toString(),
+            amount: paidAmount,
+          });
+        }
+      }
+    } catch (fallbackErr) {
+      console.error("Fallback confirmation email also failed:", fallbackErr);
+    }
     return { success: false, message: error.message };
   }
 }
