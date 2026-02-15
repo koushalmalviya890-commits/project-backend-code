@@ -4,11 +4,15 @@ const Razorpay = require('razorpay');
 const Booking = require('../models/Booking'); 
 const Facility = require('../models/Facility');
 const Startup = require('../models/Startup');
+const User = require('../models/Startup')
 const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
 const Notification = require('../models/Notification'); // Ensure y
 const { generateAndStoreInvoice } = require("../../services/invoiceService");
 const { verifyPaymentSignature } = require("../../utils/razorpay");
-
+const { 
+  sendFacilityContactMail, 
+  sendServiceProviderNotificationEmail 
+} = require('../../lib/email');
 
 // Initialize Razorpay
 const razorpay = new Razorpay({
@@ -441,6 +445,60 @@ exports.verifyPaymentSignatureFacilityBooking = async (req, res) => {
         }
       } catch (err) {
         console.error("❌ Invoice generation error:", err);
+      }
+
+      try {
+        console.log("📧 Fetching details to send notification emails...");
+
+        // Fetch Facility
+        const facility = await Facility.findById(updatedBooking.facilityId);
+        
+        // Fetch Startup Name
+        let startupName = 'Customer';
+        if (updatedBooking.startupId) {
+          const startup = await Startup.findOne({ userId: updatedBooking.startupId });
+          if (startup) startupName = startup.startupName || startup.contactName || 'Customer';
+        } else if (updatedBooking.affiliateUserEmail) {
+          startupName = updatedBooking.affiliateUserEmail;
+        }
+
+        // Fetch Service Provider Email
+        let serviceProviderEmail = null;
+        if (updatedBooking.incubatorId) {
+          const spUser = await User.findById(updatedBooking.incubatorId);
+          if (spUser) serviceProviderEmail = spUser.email;
+        }
+
+        // Base Email Payload
+        const emailPayload = {
+          facilityName: facility?.details?.name || 'Facility',
+          startupName: startupName,
+          rentalPlan: updatedBooking.rentalPlan,
+          startDate: updatedBooking.startDate,
+          endDate: updatedBooking.endDate,
+          amount: updatedBooking.amount || updatedBooking.baseAmount // Adjust based on your schema
+        };
+
+        // Send SP Email
+        if (serviceProviderEmail) {
+          await sendServiceProviderNotificationEmail({
+            to: serviceProviderEmail,
+            ...emailPayload
+          });
+          console.log(`✅ SP Notification sent to ${serviceProviderEmail}`);
+        }
+
+        // Send Facility Direct Email (if the facility has a separate contact email)
+        if (facility && facility.email && facility.email !== serviceProviderEmail) {
+          await sendFacilityContactMail({
+            to: facility.email,
+            ...emailPayload
+          });
+          console.log(`✅ Facility Contact Mail sent to ${facility.email}`);
+        }
+
+      } catch (emailErr) {
+        console.error("❌ Notification email error:", emailErr);
       }
     }).unref();
 
