@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const protect = async (req, res, next) => {
-  const token = req.cookies.token; // Read the same cookie we set in login
+  let token = req.cookies.token; // Read the same cookie we set in login
 
 // 2. Check Header as fallback (For API clients/Postman)
   if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -44,7 +44,7 @@ const optionalProtect = async (req, res, next) => {
       
     } catch (error) {
       // Token exists but is invalid/expired -> Treat as Guest
-      // console.log("Optional Auth: Token invalid, proceeding as guest.");
+      console.log("Optional Auth: Token invalid, proceeding as guest.");
       req.user = null;
     }
   } else {

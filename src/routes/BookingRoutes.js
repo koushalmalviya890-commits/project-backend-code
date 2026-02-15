@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { protect } = require("../middleware/authMiddleware");
+const { protect, optionalProtect } = require("../middleware/authMiddleware");
 
 const verifyWebhookSignature = require("../middleware/verifyWebhookSignature");
 
@@ -31,7 +31,7 @@ router.get("/", protect, getBookings);
 router.get("/failed", protect, getFailedBooking);
 
 // Booking Details (Dynamic route LAST)
-router.get("/:id", protect, getBookingById);
+router.get("/:id", optionalProtect, getBookingById);
 
 module.exports = router;
 
