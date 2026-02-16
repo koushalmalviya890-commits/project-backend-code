@@ -598,12 +598,17 @@ exports.searchFacilities = async (req, res) => {
     const propertyTypesParam = req.query.propertyTypes || 'All';
     const minPrice = parseInt(req.query.minPrice || '0');
     const maxPrice = parseInt(req.query.maxPrice || '100000');
-    const location = req.query.location || '';
     const sortBy = req.query.sortBy || 'newest';
     const isFeatured = req.query.isFeatured === 'true';
-    const city = req.query.city || '';
-    const state = req.query.state || '';
-    const facilityType = req.query.facilityType || '';
+    // const location = req.query.location || '';
+    // const city = req.query.city || '';
+    // const state = req.query.state || '';
+    // const facilityType = req.query.facilityType || '';
+
+
+    const searchScopes = req.query.searchScope 
+      ? req.query.searchScope.split(',') 
+      : ['facility', 'enabler', 'sector', 'location'];
 
     // Base Query
     const query = {
@@ -615,56 +620,75 @@ exports.searchFacilities = async (req, res) => {
       query.isFeatured = true;
     }
 
-    // --- Search Logic ---
-    if (search) {
-      const formattedSearch = search.toLowerCase().replace(/\s+/g, '-');
+if (search.trim()) {
+      // Split the search string by commas or spaces (e.g., "lab, chennai" -> ["lab", "chennai"])
+      const searchTerms = search.split(/[\s,]+/).filter(t => t.trim() !== '');
+      
+      const andConditions = [];
 
-      // Find matching Service Providers first
-      const enablerMatch = await ServiceProvider.find({
-        $or: [
-          { serviceName: { $regex: search, $options: 'i' } },
-          { primaryContact1Name: { $regex: search, $options: 'i' } },
-          { primaryContact1Designation: { $regex: search, $options: 'i' } }
-        ]
-      }).select('userId');
+      for (const term of searchTerms) {
+        const regexTerm = { $regex: term, $options: 'i' };
+        const formattedTerm = { $regex: term.toLowerCase().replace(/\s+/g, '-'), $options: 'i' };
+        
+        const termOrConditions = [];
 
-      const matchedUserIds = enablerMatch.map(sp => sp.userId);
+        // 🔍 IF 'FACILITY' TAB IS SELECTED
+        if (searchScopes.includes('facility')) {
+          termOrConditions.push({ 'details.name': regexTerm });
+          termOrConditions.push({ 'details.description': regexTerm });
+          termOrConditions.push({ facilityType: formattedTerm });
+        }
 
-      query['$or'] = [
-        { 'details.name': { $regex: formattedSearch, $options: 'i' } },
-        { 'details.description': { $regex: search, $options: 'i' } },
-        { address: { $regex: search, $options: 'i' } },
-        { city: { $regex: search, $options: 'i' } },
-        { state: { $regex: search, $options: 'i' } },
-        { country: { $regex: search, $options: 'i' } },
-        { pincode: { $regex: search, $options: 'i' } },
-        { facilityType: { $regex: formattedSearch, $options: 'i' } },
-        { relevantSectors: { $regex: formattedSearch, $options: 'i' } },
-        { serviceProviderId: { $in: matchedUserIds } },
-        // Note: Direct join query on ServiceProvider name happens in aggregation, 
-        // but adding IDs here helps performance.
-      ];
+        // 🔍 IF 'ENABLER' TAB IS SELECTED
+        if (searchScopes.includes('enabler')) {
+          const enablerMatch = await ServiceProvider.find({
+            $or: [
+              { serviceName: regexTerm },
+              { primaryContact1Name: regexTerm },
+              { primaryContact1Designation: regexTerm }
+            ]
+          }).select('userId');
+
+          if (enablerMatch.length > 0) {
+            const matchedUserIds = enablerMatch.map(sp => sp.userId);
+            termOrConditions.push({ serviceProviderId: { $in: matchedUserIds } });
+          }
+        }
+
+        // 🔍 IF 'SECTOR' TAB IS SELECTED
+        if (searchScopes.includes('sector')) {
+          termOrConditions.push({ relevantSectors: regexTerm });
+          termOrConditions.push({ relevantSectors: formattedTerm });
+        }
+
+        // 🔍 IF 'LOCATION' TAB IS SELECTED
+        if (searchScopes.includes('location')) {
+          termOrConditions.push({ address: regexTerm });
+          termOrConditions.push({ city: regexTerm });
+          termOrConditions.push({ state: regexTerm });
+          termOrConditions.push({ country: regexTerm });
+          termOrConditions.push({ pincode: regexTerm });
+        }
+
+        // Add this term's logic to the main AND array
+        if (termOrConditions.length > 0) {
+          andConditions.push({ $or: termOrConditions });
+        } else {
+          // Strict block: if a term matches absolutely NO possible scope, return 0 results
+          andConditions.push({ _id: null }); 
+        }
+      }
+
+      // Apply the built $and conditions to the main query
+      if (andConditions.length > 0) {
+        query['$and'] = query['$and'] || [];
+        query['$and'].push(...andConditions);
+      }
     }
-
-    // --- Location Logic ---
-    if (location) {
-      const locationQuery = [
-        { address: { $regex: location, $options: 'i' } },
-        { city: { $regex: location, $options: 'i' } },
-        { state: { $regex: location, $options: 'i' } },
-        { country: { $regex: location, $options: 'i' } },
-        { pincode: { $regex: location, $options: 'i' } }
-      ];
-      query['$and'] = query['$and'] || [];
-      query['$and'].push({ $or: locationQuery });
-    }
-
-    if (city) query.city = { $regex: city, $options: 'i' };
-    if (state) query.state = { $regex: state, $options: 'i' };
 
     // --- Facility Types ---
-    const propertyTypes = propertyTypesParam.split(',');
-    if (!propertyTypes.includes('All')) {
+   const propertyTypes = propertyTypesParam.split(',');
+    if (!propertyTypes.includes('All') && propertyTypes.length > 0) {
       const typeMap = {
         'Individual Cabin': 'individual-cabin',
         'Coworking space': 'coworking-spaces',
@@ -684,13 +708,7 @@ exports.searchFacilities = async (req, res) => {
       }
     }
 
-    if (facilityType) {
-      const facilityTypes = facilityType.split(',');
-      query.facilityType = { $in: facilityTypes };
-    }
-
-    // --- Rental Plan Logic ---
-    if (listingStatus !== 'All') {
+   if (listingStatus !== 'All') {
       query['details.rentalPlans'] = {
         $elemMatch: {
           name: listingStatus,
@@ -705,6 +723,7 @@ exports.searchFacilities = async (req, res) => {
       };
     }
 
+    
     // --- Sorting ---
     let sortOptions = {};
     switch (sortBy) {
