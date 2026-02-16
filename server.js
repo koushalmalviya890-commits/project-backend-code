@@ -7,6 +7,8 @@ const PORT = process.env.PORT;
   try {
     await connectDB();
 
+    require('./lib/reminderCron');
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

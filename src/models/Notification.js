@@ -16,7 +16,8 @@ const NotificationSchema = new Schema(
         'facility-approved',          // Original facility approved
         'event-booking-confirmed',    // 🆕 User event booking confirmed
         'event-booking-received',     // 🆕 Service provider received event booking
-        'event-payment-completed'     // 🆕 Event payment completed
+        'event-payment-completed',     // 🆕 Event payment completed
+        'plan-expiry-reminder'
       ]
     },
     title: { 
