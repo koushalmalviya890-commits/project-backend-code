@@ -1,25 +1,3 @@
-const mongoose = require("mongoose");
-// controllers/paymentController.js
-const Razorpay = require('razorpay');
-const Booking = require('../models/Booking'); 
-const Facility = require('../models/Facility');
-const Startup = require('../models/Startup');
-const User = require('../models/Startup')
-const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
-const Notification = require('../models/Notification'); // Ensure y
-const { generateAndStoreInvoice } = require("../../services/invoiceService");
-const { generateRazorpayOrder, verifyPaymentSignature } = require("../../utils/razorpay");
-const { 
-  sendFacilityContactMail, 
-  sendServiceProviderNotificationEmail 
-} = require('../../lib/email');
-
-// Initialize Razorpay
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
-
 /**
  * Creates a Razorpay order for a facility booking
  * Called by Next.js after session validation and DB booking creation
@@ -158,6 +136,30 @@ const razorpay = new Razorpay({
 //     return res.status(500).json({ isValid: false, message: 'Verification failed', error: error.message });
 //   }
 // };
+
+
+const mongoose = require("mongoose");
+// controllers/paymentController.js
+const Razorpay = require('razorpay');
+const Booking = require('../models/Booking'); 
+const Facility = require('../models/Facility');
+const Startup = require('../models/Startup');
+const User = require('../models/Startup')
+const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
+const Notification = require('../models/Notification'); // Ensure y
+const { generateAndStoreInvoice } = require("../../services/invoiceService");
+const { generateRazorpayOrder, verifyPaymentSignature } = require("../../utils/razorpay");
+const { 
+  sendFacilityContactMail, 
+  sendServiceProviderNotificationEmail 
+} = require('../../lib/email');
+
+// Initialize Razorpay
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
 
 /**
  * Creates a Booking AND Razorpay Order
@@ -579,5 +581,48 @@ exports.verifyPaymentSignatureFacilityBooking = async (req, res) => {
     }
 
     return res.status(500).json({ isValid: false, message: 'Verification failed', error: error.message });
+  }
+};
+
+exports.markPaymentFailed = async (req, res) => {
+  try {
+    // 1. Auth check
+    if (!req.user || req.user.userType !== 'startup') {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { bookingId, errorDetails } = req.body;
+
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ message: 'Invalid booking ID' });
+    }
+
+    // 2. Update the booking status to 'failed'
+    const updatedBooking = await Booking.findOneAndUpdate(
+      { 
+        _id: bookingId, 
+        startupId: req.user.id // Security: ensure they own the booking
+      }, 
+      {
+        $set: {
+          paymentStatus: 'failed',
+          'paymentDetails.failureReason': errorDetails?.description || 'User cancelled or payment failed',
+          'paymentDetails.failedAt': new Date(),
+          'paymentDetails.errorCode': errorDetails?.code || 'UNKNOWN',
+          updatedAt: new Date()
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedBooking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'Payment marked as failed' });
+
+  } catch (error) {
+    console.error('Error marking payment as failed:', error);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
