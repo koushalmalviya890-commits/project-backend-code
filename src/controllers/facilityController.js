@@ -50,7 +50,8 @@ exports.getFacilities = async (req, res) => {
 
     // Fetch facilities for this provider
     const facilities = await Facility.find({ 
-      serviceProviderId: userId 
+      serviceProviderId: userId,
+      status: { $ne: 'rejected' } // Exclude rejected facilities from frontend responses
       // privacyType: 'public' // Uncomment if you want to filter strictly like your GET logic option
     }).sort({ updatedAt: -1 });
 
@@ -78,6 +79,10 @@ exports.getFacilityById = async (req, res) => {
       return res.status(404).json({ error: 'Facility not found' });
     }
 
+    // Do not expose facilities that were rejected
+    if (facility.status === 'rejected') {
+      return res.status(404).json({ error: 'Facility not found' });
+    }
     // 2. Get Service Provider Info
     // The model typically stores this as an ObjectId, but we handle string/ObjectId just in case
     const serviceProviderId = facility.serviceProviderId;

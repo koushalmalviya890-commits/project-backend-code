@@ -8,7 +8,7 @@ const User = require('../models/Startup')
 const ServiceProvider = require('../models/ServiceProvider'); // or User model if that's where providers are
 const Notification = require('../models/Notification'); // Ensure y
 const { generateAndStoreInvoice } = require("../../services/invoiceService");
-const { verifyPaymentSignature } = require("../../utils/razorpay");
+const { generateRazorpayOrder, verifyPaymentSignature } = require("../../utils/razorpay");
 const { 
   sendFacilityContactMail, 
   sendServiceProviderNotificationEmail 
@@ -324,40 +324,94 @@ const {
  */
 exports.createRetryRazorpayOrder = async (req, res) => {
   try {
-    const { bookingId, amount, currency = 'INR', receipt, notes = {} } = req.body;
+    // 1. Authentication & Authorization
+    // Ensure you have auth middleware running before this controller to populate req.user
+    if (!req.user || req.user.userType !== 'startup') {
+      return res.status(403).json({ message: 'Only startups can retry bookings' });
+    }
 
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    const { bookingId, token } = req.body;
+
+    if (!bookingId || !mongoose.Types.ObjectId.isValid(bookingId)) {
       return res.status(400).json({ message: 'Invalid booking ID' });
     }
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Valid amount is required' });
+    // 2. Fetch the booking & verify ownership
+    // We strictly check that the logged-in user's ID matches the booking's startupId
+    const booking = await Booking.findOne({
+      _id: bookingId,
+      startupId: req.user.id 
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found or unauthorized' });
     }
 
-    const razorpayOrder = await razorpay.orders.create({
-      amount: Math.round(amount * 100),
-      currency,
-      receipt: receipt || bookingId,
+    // 3. Security & State Validations
+    if (token && booking.retryToken !== token) {
+      return res.status(401).json({ message: 'Invalid retry token' });
+    }
+
+    if (booking.paymentStatus !== 'failed') {
+      return res.status(400).json({ message: 'This booking is not in a retry-able state' });
+    }
+
+    if (booking.expiresAt && new Date(booking.expiresAt) < new Date()) {
+      return res.status(410).json({ message: 'The retry window for this booking has expired' });
+    }
+
+    // 4. Create the new Razorpay Order using your utility function
+    const razorpayOrder = await generateRazorpayOrder(booking.amount, {
+      receipt: booking._id.toString(), // Link order to booking ID
       notes: {
-        source: 'booking-retry',
-        ...notes,
-      },
+        bookingId: booking._id.toString(),
+        facilityId: booking.facilityId.toString(),
+        startupId: req.user.id,
+        rentalPlan: booking.rentalPlan || 'N/A',
+        isRetry: 'true',
+      }
     });
 
     if (!razorpayOrder) {
-      return res.status(500).json({ message: 'Failed to create retry order' });
+      return res.status(500).json({ message: 'Failed to create Razorpay order' });
     }
 
-    res.status(201).json({
-      message: 'Razorpay retry order created successfully',
-      order: {
-        id: razorpayOrder.id,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        receipt: razorpayOrder.receipt,
-        status: razorpayOrder.status,
+    // 5. Prepare the retry log entry
+    const retryAttempt = {
+      razorpayOrderId: razorpayOrder.id,
+      attemptedAt: new Date(),
+      status: 'pending',
+    };
+
+    // 6. Update the Booking in MongoDB
+    // CRITICAL: We must save the new Razorpay Order ID so verification works later
+    await Booking.findByIdAndUpdate(
+      bookingId,
+      {
+        $set: {
+          razorpayOrderId: razorpayOrder.id, // Update to the new Order ID
+          updatedAt: new Date(),
+        },
+        $unset: {
+          retryToken: "", // Remove the token so it can't be used again
+        },
+        $push: {
+          paymentRetries: retryAttempt, // Log history
+        },
       },
+      { new: true }
+    );
+
+    // 7. Return the data your frontend needs to open the checkout
+    res.status(200).json({
+      message: 'Razorpay retry order created successfully',
+      orderId: razorpayOrder.id,
+      bookingId: booking._id.toString(),
+      amount: booking.amount,
+      currency: 'INR',
+      keyId: process.env.RAZORPAY_KEY_ID, // Send public key to frontend
     });
+
   } catch (error) {
     console.error('❌ Error creating retry Razorpay order:', error);
     res.status(500).json({

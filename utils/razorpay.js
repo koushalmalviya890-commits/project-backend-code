@@ -2,11 +2,12 @@ const crypto = require("crypto");
 const Razorpay = require("razorpay");
 /**
  * generateRazorpayOrder
- * @param {*} amount
- * @returns {*} json
+ * @param {number} amount - Amount in INR
+ * @param {Object} extraOptions - Optional: { receipt, notes, currency }
+ * @returns {Promise<Object>} Razorpay Order Object
  */
-const generateRazorpayOrder = async (amount) => {
-  try {
+const generateRazorpayOrder = async (amount, extraOptions = {}) => {
+    try {
     const razorpay_api_key = process.env.RAZORPAY_KEY_ID;
     const razorpay_key_secret = process.env.RAZORPAY_KEY_SECRET;
 
@@ -15,12 +16,14 @@ const generateRazorpayOrder = async (amount) => {
       key_secret: razorpay_key_secret,
     });
 
-    const receipt_id = `receipt_${Math.floor(Math.random() * 1000000)}`;
+const receipt_id = extraOptions.receipt || `receipt_${Math.floor(Math.random() * 1000000)}`;
 
-    const options = {
-      amount: amount * 100, // Razorpay uses paise (so multiply by 100)
-      currency: "INR",
+
+ const options = {
+      amount: Math.round(amount * 100), // Razorpay uses paise. Rounding prevents float errors.
+      currency: extraOptions.currency || "INR",
       receipt: receipt_id,
+      notes: extraOptions.notes || {}, // Pass notes if provided
     };
 
     const order = await instance.orders.create(options);

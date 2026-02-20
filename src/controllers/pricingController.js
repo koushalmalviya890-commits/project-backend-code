@@ -87,7 +87,7 @@ exports.calculateFinalPrice = async (req, res) => {
     const planPrice = parseFloat(selectedPlan.price) || 0;
     
     const basePrice = planPrice * units * seats;
-    console.log(basePrice ,"Base price with only plans")
+    // console.log(basePrice ,"Base price with only plans")
 
     // 6. Fetch Service Provider
     const serviceProvider = await ServiceProvider.findOne({
@@ -120,11 +120,11 @@ exports.calculateFinalPrice = async (req, res) => {
       // Existing User: Flat Fee
       // Note: Ensure getFixedServiceFee is imported
       fixedFee = getFixedServiceFee(facility.facilityType || "") * units * seats; 
-      console.log(fixedFee, "fixedfee:::::")
+      // console.log(fixedFee, "fixedfee:::::")
     } else {
       // New User / Guest: 7% Commission
       fixedFee = (basePrice * 0.07);
-      console.log(fixedFee, "fixedfee:::::")
+      // console.log(fixedFee, "fixedfee:::::")
     }
 
     // --- TOTAL LOGIC ---
@@ -133,11 +133,11 @@ exports.calculateFinalPrice = async (req, res) => {
     if (hasGST) {
       gst = (basePrice + fixedFee) * 0.18;
     }
-console.log("gst", gst)
+// console.log("gst", gst)
     finalPricebeforeGST = basePrice + fixedFee;
-    console.log(finalPricebeforeGST)
+    // console.log(finalPricebeforeGST)
     finalPrice = finalPricebeforeGST + gst;
-console.log(finalPrice)
+// console.log(finalPrice)
     // 8. Return Response
     res.json({
       success: true,
