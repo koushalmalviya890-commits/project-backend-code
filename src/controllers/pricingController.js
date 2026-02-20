@@ -48,7 +48,7 @@ function getFixedServiceFee(facilityType) {
   return 30;
 }
 
-exports.     calculateFinalPrice = async (req, res) => {
+exports.calculateFinalPrice = async (req, res) => {
   try {
     // 1. Extract Inputs (Ignore 'basePrice' from frontend for security)
     const { facilityId, rentalPlan, unitCount, bookingSeats } = req.body;
