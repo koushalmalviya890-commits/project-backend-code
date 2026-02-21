@@ -42,7 +42,7 @@ function generateProfessionalInvoiceHTML(data) {
   };
 
   const serviceFee = booking.serviceFee || 0;
-  const originalBaseAmount = booking.baseAmount + serviceFee || 0;
+  const originalBaseAmount = booking.baseAmount || 0;
   const gstOnServiceFee = serviceFee * 0.18;
   const gstAmount = booking.gstAmount || 0;
   const totalGst = gstAmount;
@@ -552,11 +552,11 @@ function generateProfessionalInvoiceHTML(data) {
                 <div class="detail-value">${formatDate(booking.startDate)} - ${formatDate(booking.endDate)}</div>
               </div>
               <div class="detail-item">
-                <div class="detail-label">Unit Count</div>
+                <div class="detail-label">Duration Count</div>
                 <div class="detail-value">${booking.unitCount || 1}</div>
               </div>
                 <div class="detail-item">
-                <div class="detail-label">Seat Count</div>
+                <div class="detail-label">Booking Count</div>
                 <div class="detail-value">${booking.bookingSeats || 1}</div>
               </div>
             </div>
