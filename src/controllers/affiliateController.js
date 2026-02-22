@@ -312,7 +312,7 @@ const Booking = require('../models/Booking.js');
 
 const Facility = require("../models/Facility.js");
 const Razorpay = require("razorpay");
-
+const { sendServiceProviderAgreementEmail } = require("../../lib/emailService.js");
 const { generateAndStoreInvoice } = require("../../lib/emailAffiliate.js");
 const { addCustomerViaAffiliateLink } = require("../../lib/addCustomerViaAffiliateLink.js");
 const { sendServiceProviderNotificationEmail, sendFacilityContactMail } = require("../../lib/email.js");
