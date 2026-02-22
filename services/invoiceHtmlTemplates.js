@@ -6,6 +6,7 @@ function generateProfessionalInvoiceHTML(data) {
     serviceProvider,
     invoiceNumber,
     invoiceDate,
+    logoUrl,
   } = data;
 
   const formatCurrency = (amount) => {
@@ -398,7 +399,7 @@ function generateProfessionalInvoiceHTML(data) {
         <table>
           <tr>
           <td class="company-logo">
-              <img src="https://cumma-images.s3.eu-north-1.amazonaws.com/logo-green.png" alt="Cumma Logo" style="height:50px;max-width:180px;object-fit:contain;" />
+              ${logoUrl ? `<img src="${logoUrl}" alt="Cumma Logo" style="height:50px;max-width:180px;object-fit:contain;" />` : `<h1>CUMMA</h1>`}
             </td>
             <td class="company-details">
                <p style="font-size: small; font-weight: 500;">Idamumai Technologies Private limited</p>

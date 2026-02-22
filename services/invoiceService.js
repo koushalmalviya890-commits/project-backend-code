@@ -49,6 +49,7 @@ async function generateAndStoreInvoice(bookingId) {
       .toString()
       .substring(9, 13)}`;
 
+    // Generate the HTML — use direct URL for logo (Base64 bloats the payload and causes 503)
     const invoiceHTML = generateProfessionalInvoiceHTML({
       booking,
       facility,
@@ -56,28 +57,38 @@ async function generateAndStoreInvoice(bookingId) {
       serviceProvider,
       invoiceNumber,
       invoiceDate: new Date(),
+      logoUrl: "https://cumma-images.s3.eu-north-1.amazonaws.com/logo-green.png",
     });
 
     const accessKey = "ed1d01b7e7626fc1cdf1cc04f0f61075";
     if (!accessKey) {
       return { success: false, message: "PDFLAYER_ACCESS_KEY missing" };
     }
-
 const pdfResponse = await axios.post(
-      `http://api.pdflayer.com/api/convert?access_key=${accessKey}`,
-      {
-        document_html: invoiceHTML,
-        document_name: "invoice.pdf",
-        page_size: "A4",
-        test: "1",
-      },
-      {
-        responseType: "arraybuffer",
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+  `http://api.pdflayer.com/api/convert?access_key=${accessKey}`,
+  new URLSearchParams({
+    document_html: invoiceHTML,
+    document_name: "invoice.pdf",
+    page_size: "A4",
+    test: "1",
+  }).toString(),
+  {
+    responseType: "arraybuffer",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    validateStatus: () => true, // Don't throw on non-2xx so we can read pdflayer's error body
+  }
+);
+   const pdfBuffer = Buffer.from(pdfResponse.data);
 
-    const pdfBuffer = Buffer.from(pdfResponse.data);
+// Check if pdflayer returned a JSON error instead of a PDF
+const maybeText = pdfBuffer.toString("utf-8", 0, 20);
+if (maybeText.startsWith("{")) {
+  const errorBody = JSON.parse(pdfBuffer.toString("utf-8"));
+  console.error("pdflayer API error:", errorBody);
+  throw new Error(`pdflayer error: ${errorBody.error?.info || JSON.stringify(errorBody)}`);
+}
 
     // Upload to S3
     const bucketName = process.env.AWS_BUCKET_NAME || "cumma-images";
@@ -166,7 +177,7 @@ if (recipientEmail) {
             bookingDates: `${formattedStartDate} – ${formattedEndDate}`,
             bookingId: bookingId.toString(),
             amount: Number(booking.finalAmount ?? booking.amount ?? 0),
-            invoiceUrl: "#", // No invoice generated yet
+        invoiceUrl: null,// No invoice generated yet
           });
 
           console.log("✅ Fallback confirmation email sent successfully.");

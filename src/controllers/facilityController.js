@@ -517,6 +517,7 @@ exports.getFacilitiesByProvider = async (req, res) => {
         $match: {
           serviceProviderId: serviceProviderId,
           status: 'active',
+          privacyType: 'public' // Only return public facilities
         }
       },
       {

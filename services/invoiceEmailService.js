@@ -30,7 +30,7 @@ async function sendInvoiceEmail({
   bookingDates,
   bookingId,
   amount,
-  // invoiceUrl,
+  invoiceUrl,
 }) {
   console.log("📧 Attempting to send email to:", recipientEmail);
   const transporter = createEmailTransporter();
@@ -41,9 +41,9 @@ async function sendInvoiceEmail({
     subject: `Congratulations, Your Booking through Cumma is Confirmed`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="https://cumma-images.s3.eu-north-1.amazonaws.com/logo-green.png" alt="Cumma Logo" style="height: 60px;" />
-        </div>
+   <div style="text-align: center; margin-bottom: 20px;">
+        <img src="cid:emailLogo" alt="Cumma Logo" style="height: 60px;" />
+      </div>
 
         <p style="font-size: 16px;">Hi ${startupName || "there"},</p>
 
@@ -56,23 +56,61 @@ async function sendInvoiceEmail({
           ${facilityLocation}
         </p>
 
+        <!-- Value Message -->
+      <p style="font-size: 16px; color: #333; line-height: 1.6;">
+        You’ve just unlocked access to a facility designed to help you create, collaborate, and grow.
+        From focused work to big ideas, we’re glad to be part of your journey.
+      </p>
+
+      <!-- Note for Arrival -->
+      <p style="font-size: 16px; color: #333;">
+        When you arrive, please show your booking invoice for access to the space (if asked).
+      </p>
+
         <p style="font-size: 16px;">
           <strong>Booking ID:</strong> ${bookingId}<br/>
           <strong>Amount Paid:</strong> ₹${Number(amount).toLocaleString("en-IN")}
         </p>
-
+      <!-- Invoice Section -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${invoiceUrl}"  style="
+          background-color: #4F46E5;
+          color: white;
+          padding: 12px 24px;
+          text-decoration: none;
+          border-radius: 6px;
+          font-weight: 500;
+          display: inline-block;
+        ">
+          📥 View Invoice
+        </a>
+      </div>
         
         <p style="text-align:center;color:#4F46E5;font-style:italic;">
           And hey champion, you save at least 3 papers every time you access through Cumma!
         </p>
 
-        <div style="margin-top: 40px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
-          <p style="color:#333;">Warm regards,<br/>Team Cumma</p>
-          <a href="https://www.cumma.in" style="color:#4F46E5;">www.cumma.in</a>
-        </div>
+         <!-- Footer -->
+      <div style="margin-top: 40px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+        <p style="color: #333; font-size: 16px; margin: 0 0 10px 0;">
+          We’re excited to support your next move. Have a good day!
+        </p>
+        <p style="color: #666; font-size: 14px;">
+          Warm regards,<br />
+          Team Cumma<br />
+          <a href="https://www.cumma.in" style="color: #4F46E5;">www.cumma.in</a>
+        </p>
       </div>
-    `,
-  };
+    </div>
+   `,
+  attachments: [
+    {
+      filename: 'logo.png',
+      path: './public/logo.png',
+      cid: 'emailLogo'
+    }
+  ]
+};
 
 
   try {
